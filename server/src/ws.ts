@@ -10,6 +10,7 @@ export function registerClient(socket: WebSocket) {
 export type ServerEvent =
   | { type: "match"; gameId: number; gameName: string; thumbnail: string | null }
   | { type: "sync-started" }
+  | { type: "sync-progress"; message: string }
   | { type: "sync-finished"; gamesAdded: number; gamesUpdated: number; status: "success" | "error"; error?: string };
 
 export function broadcast(event: ServerEvent) {

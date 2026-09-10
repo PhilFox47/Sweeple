@@ -17,6 +17,7 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [matchesRefresh, setMatchesRefresh] = useState(0);
   const [syncSignal, setSyncSignal] = useState(0);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -36,10 +37,18 @@ export default function App() {
       if (event.type === "match") {
         pushToast("match", `It's a match! You both liked "${event.gameName}" 🎉`);
         setMatchesRefresh((n) => n + 1);
+      } else if (event.type === "sync-started") {
+        setSyncProgress(null);
+        setSyncSignal((n) => n + 1);
+      } else if (event.type === "sync-progress") {
+        setSyncProgress(event.message);
       } else if (event.type === "sync-finished") {
+        setSyncProgress(null);
         setSyncSignal((n) => n + 1);
         if (event.status === "success") {
           pushToast("info", `BGG sync complete: ${event.gamesAdded} added, ${event.gamesUpdated} updated.`);
+        } else if (event.error === "Sync stopped") {
+          pushToast("info", "Sync stopped.");
         } else {
           pushToast("error", `BGG sync failed: ${event.error}`);
         }
@@ -70,7 +79,7 @@ export default function App() {
         </div>
       </header>
 
-      <SyncControl syncSignal={syncSignal} />
+      <SyncControl syncSignal={syncSignal} progress={syncProgress} />
 
       <nav className="tab-bar">
         <button className={tab === "swipe" ? "tab-active" : ""} onClick={() => setTab("swipe")}>

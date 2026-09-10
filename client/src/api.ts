@@ -98,6 +98,7 @@ export const api = {
   markPlayed: (matchId: number) => request<{ ok: true }>(`/api/matches/${matchId}/played`, { method: "POST" }),
 
   triggerSync: () => request<{ ok: true; started: boolean }>("/api/sync", { method: "POST" }),
+  stopSync: () => request<{ ok: true; stopped: boolean }>("/api/sync/stop", { method: "POST" }),
   syncStatus: () =>
     request<{
       inProgress: boolean;

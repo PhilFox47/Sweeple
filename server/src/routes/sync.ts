@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { authenticate } from "../auth.js";
-import { isSyncInProgress, runSync } from "../sync.js";
+import { isSyncInProgress, runSync, stopSync } from "../sync.js";
 
 export default async function syncRoutes(app: FastifyInstance) {
   app.post("/api/sync", { preHandler: authenticate }, async (request, reply) => {
@@ -10,6 +10,10 @@ export default async function syncRoutes(app: FastifyInstance) {
     }
     runSync().catch((err) => app.log.error(err, "BGG sync failed"));
     return { ok: true, started: true };
+  });
+
+  app.post("/api/sync/stop", { preHandler: authenticate }, async () => {
+    return { ok: true, stopped: stopSync() };
   });
 
   app.get("/api/sync/status", { preHandler: authenticate }, async () => {

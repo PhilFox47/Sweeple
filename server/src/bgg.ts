@@ -3,8 +3,44 @@ import { XMLParser } from "fast-xml-parser";
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
 const BASE = "https://boardgamegeek.com/xmlapi2";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export interface BggRequestOptions {
+  signal?: AbortSignal;
+  onProgress?: (message: string) => void;
+}
+
+// BGG prepares a collection export in the background and serves it on a later request, so
+// polling steadily beats backing off aggressively — which BGG answers with 401/403.
+const POLL_INTERVAL_MS = 5000;
+// A safety net for the weekly unattended sync; interactive syncs are ended with the stop button.
+const MAX_WAIT_MS = 30 * 60 * 1000;
+
+class SyncCancelledError extends Error {
+  constructor() {
+    super("Sync stopped");
+    this.name = "SyncCancelledError";
+  }
+}
+
+export function isCancellation(err: unknown): boolean {
+  return (
+    (err instanceof Error && err.name === "SyncCancelledError") ||
+    (err instanceof Error && err.name === "AbortError")
+  );
+}
+
+function sleep(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(new SyncCancelledError());
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new SyncCancelledError());
+      },
+      { once: true }
+    );
+  });
 }
 
 // Node's fetch sends "User-Agent: node", which BGG's bot filtering rejects outright.
@@ -16,16 +52,26 @@ const BROWSER_HEADERS: Record<string, string> = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-async function fetchWithRetry(url: string, maxAttempts = 10): Promise<string> {
-  // BGG queues a collection export on first request and serves it on a later one. A browser
-  // carries its cookies across that reload, so mirror that rather than arriving fresh each time.
-  let cookie = "";
-  let authFailures = 0;
+// BGG announces a queued export as a <message> body — sometimes with 202, but also with a
+// plain 200. Treated as success it parses to zero items and silently wipes the collection.
+function isQueuedBody(xml: string): boolean {
+  return /<message>/i.test(xml) && /(accepted|being processed|will be processed|try again)/i.test(xml);
+}
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+async function fetchWithRetry(url: string, label: string, options: BggRequestOptions = {}): Promise<string> {
+  const { signal, onProgress } = options;
+  const deadline = Date.now() + MAX_WAIT_MS;
+  // BGG hands out a session cookie with the queued export and expects it back, exactly as a
+  // browser reload would return it.
+  let cookie = "";
+
+  for (let attempt = 1; ; attempt++) {
+    if (signal?.aborted) throw new SyncCancelledError();
+
     const res = await fetch(url, {
       headers: cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS,
       redirect: "follow",
+      signal,
     });
 
     const setCookie = res.headers.get("set-cookie");
@@ -37,34 +83,34 @@ async function fetchWithRetry(url: string, maxAttempts = 10): Promise<string> {
       if (jar.length) cookie = [cookie, ...jar].filter(Boolean).join("; ");
     }
 
-    // 202 means "queued, ask again shortly"; 429 means slow down.
-    if (res.status === 202 || res.status === 429) {
-      await res.body?.cancel().catch(() => {});
-      await sleep((res.status === 429 ? 2500 : 1500) * attempt);
-      continue;
-    }
+    let waitReason: string | null = null;
 
-    // BGG intermittently answers 401/403 to non-browser-looking traffic even for public
-    // collections, so treat a few as transient before believing it is really a permissions problem.
-    if ((res.status === 401 || res.status === 403) && ++authFailures <= 3) {
+    if (res.ok) {
+      const text = await res.text();
+      if (!isQueuedBody(text)) return text;
+      waitReason = `BGG is preparing the ${label}`;
+    } else if (res.status === 202) {
       await res.body?.cancel().catch(() => {});
-      await sleep(2000 * authFailures);
-      continue;
-    }
-
-    if (!res.ok) {
-      // BGG explains itself in the body, so surface it rather than just the status code.
+      waitReason = `BGG is preparing the ${label}`;
+    } else if (res.status === 429 || res.status === 401 || res.status === 403 || res.status >= 500) {
+      // BGG throttles with these while an export is still being built; keep asking politely.
+      await res.body?.cancel().catch(() => {});
+      waitReason = `BGG is throttling the ${label} request (HTTP ${res.status})`;
+    } else {
       const body = (await res.text().catch(() => "")).trim().slice(0, 300);
-      const hint =
-        res.status === 401 || res.status === 403
-          ? " The collection may be private, the username may not exist, or BGG may be rate limiting this host." +
-            " If the same URL works in your browser, BGG is throttling — wait a few minutes and retry."
-          : "";
-      throw new Error(`BGG request failed (${res.status}) for ${url}.${hint}${body ? ` BGG said: ${body}` : ""}`);
+      throw new Error(`BGG request failed (${res.status}) for ${url}.${body ? ` BGG said: ${body}` : ""}`);
     }
-    return res.text();
+
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Gave up after ${Math.round(MAX_WAIT_MS / 60000)} minutes waiting for BGG to return the ${label}. ` +
+          `Last state: ${waitReason}.`
+      );
+    }
+
+    onProgress?.(`${waitReason} — retrying every ${POLL_INTERVAL_MS / 1000}s (attempt ${attempt})`);
+    await sleep(POLL_INTERVAL_MS, signal);
   }
-  throw new Error(`BGG kept queueing or throttling the request after ${maxAttempts} attempts: ${url}`);
 }
 
 // BGG reports some failures (e.g. an unknown username) as HTTP 200 with an <errors> body.
@@ -87,12 +133,17 @@ export interface CollectionItem {
   isExpansion: boolean;
 }
 
-export async function fetchCollection(username: string): Promise<CollectionItem[]> {
+export async function fetchCollection(
+  username: string,
+  options: BggRequestOptions = {}
+): Promise<CollectionItem[]> {
   // One request for the whole collection. BGG queues collection exports per user, so asking
   // twice at once (games and expansions separately) makes it reject one of them. The default
   // response already includes expansions, each item tagged with its own subtype.
   const xml = await fetchWithRetry(
-    `${BASE}/collection?username=${encodeURIComponent(username)}&own=1`
+    `${BASE}/collection?username=${encodeURIComponent(username)}&own=1`,
+    "collection",
+    options
   );
   assertNoXmlError(xml, "collection");
 
@@ -125,13 +176,18 @@ export interface GameDetails {
   mechanics: string[];
 }
 
-export async function fetchGameDetails(bggIds: number[]): Promise<GameDetails[]> {
+export async function fetchGameDetails(
+  bggIds: number[],
+  options: BggRequestOptions = {}
+): Promise<GameDetails[]> {
   const results: GameDetails[] = [];
   const chunkSize = 20;
+  const totalChunks = Math.ceil(bggIds.length / chunkSize);
   for (let i = 0; i < bggIds.length; i += chunkSize) {
     const chunk = bggIds.slice(i, i + chunkSize);
     const url = `${BASE}/thing?id=${chunk.join(",")}&stats=1`;
-    const xml = await fetchWithRetry(url);
+    options.onProgress?.(`Fetching game details ${Math.floor(i / chunkSize) + 1}/${totalChunks}`);
+    const xml = await fetchWithRetry(url, "game details", options);
     const doc = parser.parse(xml);
     const items = toArray(doc?.items?.item);
 
@@ -163,7 +219,7 @@ export async function fetchGameDetails(bggIds: number[]): Promise<GameDetails[]>
       });
     }
     // Be polite to BGG's API between chunks.
-    if (i + chunkSize < bggIds.length) await sleep(1000);
+    if (i + chunkSize < bggIds.length) await sleep(1500, options.signal);
   }
   return results;
 }
@@ -174,12 +230,16 @@ export interface PlayStats {
   lastPlayedAt: string | null;
 }
 
-export async function fetchPlayStats(username: string): Promise<Map<number, PlayStats>> {
+export async function fetchPlayStats(
+  username: string,
+  options: BggRequestOptions = {}
+): Promise<Map<number, PlayStats>> {
   const stats = new Map<number, PlayStats>();
   let page = 1;
   for (;;) {
     const url = `${BASE}/plays?username=${encodeURIComponent(username)}&page=${page}`;
-    const xml = await fetchWithRetry(url);
+    options.onProgress?.(`Fetching play history (page ${page})`);
+    const xml = await fetchWithRetry(url, "play history", options);
     const doc = parser.parse(xml);
     const plays = toArray(doc?.plays?.play);
     if (plays.length === 0) break;
@@ -200,7 +260,7 @@ export async function fetchPlayStats(username: string): Promise<Map<number, Play
     const total = Number(doc?.plays?.["@_total"] ?? 0);
     if (page * 100 >= total) break;
     page += 1;
-    await sleep(500);
+    await sleep(1000, options.signal);
   }
   return stats;
 }

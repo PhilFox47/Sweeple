@@ -1,23 +1,37 @@
 import { db } from "./db.js";
-import { fetchCollection, fetchGameDetails, fetchPlayStats } from "./bgg.js";
+import { fetchCollection, fetchGameDetails, fetchPlayStats, isCancellation } from "./bgg.js";
 import { broadcast } from "./ws.js";
 
 let syncInProgress = false;
+let controller: AbortController | null = null;
 
 export function isSyncInProgress() {
   return syncInProgress;
 }
 
+export function stopSync(): boolean {
+  if (!syncInProgress || !controller) return false;
+  controller.abort();
+  return true;
+}
+
 export async function runSync(): Promise<void> {
   if (syncInProgress) return;
   syncInProgress = true;
+  controller = new AbortController();
   broadcast({ type: "sync-started" });
 
   const username = process.env.BGG_USERNAME;
   if (!username) {
     syncInProgress = false;
+    controller = null;
     throw new Error("BGG_USERNAME is not configured");
   }
+
+  const options = {
+    signal: controller.signal,
+    onProgress: (message: string) => broadcast({ type: "sync-progress", message }),
+  };
 
   const logStmt = db.prepare(
     "INSERT INTO sync_log (started_at, status) VALUES (datetime('now'), 'running')"
@@ -28,11 +42,22 @@ export async function runSync(): Promise<void> {
   let gamesUpdated = 0;
 
   try {
-    const collection = await fetchCollection(username);
-    const details = await fetchGameDetails(collection.map((c) => c.bggId));
+    options.onProgress("Requesting your collection from BGG");
+    const collection = await fetchCollection(username, options);
+    if (collection.length === 0) {
+      // Rather than trust an empty response and mark the whole library as no longer owned.
+      throw new Error(
+        `BGG returned an empty collection for "${username}". Leaving the existing games untouched.`
+      );
+    }
+    const details = await fetchGameDetails(
+      collection.map((c) => c.bggId),
+      options
+    );
     // Play history can be private even when the collection is public. It only powers the
     // "not played recently" filter, so a failure here must not sink the whole sync.
-    const playStats = await fetchPlayStats(username).catch((err) => {
+    const playStats = await fetchPlayStats(username, options).catch((err) => {
+      if (isCancellation(err)) throw err;
       console.warn(`[sync] Could not fetch BGG play stats: ${err instanceof Error ? err.message : err}`);
       return new Map<number, { bggId: number; numPlays: number; lastPlayedAt: string | null }>();
     });
@@ -121,13 +146,15 @@ export async function runSync(): Promise<void> {
 
     broadcast({ type: "sync-finished", status: "success", gamesAdded, gamesUpdated });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const cancelled = isCancellation(err);
+    const message = cancelled ? "Sync stopped" : err instanceof Error ? err.message : String(err);
     db.prepare(
       "UPDATE sync_log SET finished_at = datetime('now'), status = 'error', error = ? WHERE id = ?"
     ).run(message, logId);
     broadcast({ type: "sync-finished", status: "error", gamesAdded, gamesUpdated, error: message });
-    throw err;
+    if (!cancelled) throw err;
   } finally {
     syncInProgress = false;
+    controller = null;
   }
 }
