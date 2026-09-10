@@ -22,6 +22,8 @@ ENV DATA_DIR=/data
 ENV CLIENT_DIST=/app/client-dist
 ENV PORT=8080
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 COPY --from=server-build /app/server/package*.json ./
 # better-sqlite3 ships prebuilt binaries for most platforms; build tools are a fallback
 # for architectures without one (e.g. some arm64 hosts), removed again to keep the image slim.
@@ -30,6 +32,11 @@ RUN apt-get update \
   && npm install --omit=dev \
   && apt-get purge -y python3 make g++ \
   && apt-get autoremove -y \
+  && rm -rf /var/lib/apt/lists/*
+
+# BGG is behind Cloudflare, which fingerprints the TLS handshake and issues a JS challenge that
+# no Node HTTP client can satisfy. Syncing drives this Chromium instead.
+RUN npx playwright install --with-deps chromium \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=server-build /app/server/dist ./dist

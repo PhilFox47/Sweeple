@@ -156,5 +156,7 @@ export async function runSync(): Promise<void> {
   } finally {
     syncInProgress = false;
     controller = null;
+    // Chromium is only needed while syncing; don't leave it resident between weekly runs.
+    await import("./browser.js").then((m) => m.closeBrowser()).catch(() => {});
   }
 }

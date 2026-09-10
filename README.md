@@ -21,27 +21,27 @@ you (no push notifications, just live in-app updates), ready to play.
   account can add further (e.g. guest) accounts via `POST /api/users/guest` — the schema and login
   flow already support more than two users.
 
-## BGG authentication
+## How Sweeple reaches BGG
 
-BGG's XML API rejects unauthenticated server requests with
-`401 WWW-Authenticate: Bearer realm="xml api"`. A browser gets through on cookies it already
-holds for boardgamegeek.com, so the container needs to be given the same thing:
+BGG sits behind Cloudflare. It answers plain server requests with
+`401 WWW-Authenticate: Bearer realm="xml api"` while the same URL works fine in a browser,
+because Cloudflare fingerprints the TLS handshake and serves a JavaScript challenge. No Node
+HTTP client can satisfy either, and copying a browser cookie does not help — `cf_clearance` is
+bound to the fingerprint that earned it.
 
-1. Open https://boardgamegeek.com in your browser and log in.
-2. F12 → Network tab → reload the page.
-3. Click the first request to boardgamegeek.com → **Request** Headers → `cookie`.
-   Not Response Headers, and not `document.cookie` in the console — that one silently omits
-   `HttpOnly` cookies such as `cf_clearance`.
-4. Copy the whole value into `BGG_COOKIE` in your `.env`, on one line.
-5. Run `navigator.userAgent` in that same browser's console and put the result in
-   `BGG_USER_AGENT`. **This is required if the cookie contains `cf_clearance`** — Cloudflare
-   binds that cookie to the User-Agent that obtained it, so a mismatch makes it useless.
+So the image bundles Chromium and syncs through it: it solves the challenge exactly as your
+browser does, then requests the API from the page's own origin. **This needs no configuration
+and no cookie.** The clearance is stored in a persistent browser profile on the data volume, so
+it is reused across syncs and restarts, and Chromium only runs while a sync is in progress.
 
-That cookie is an account credential. Keep `.env` out of version control (it is gitignored) and
-treat it like a password.
+`BGG_FETCH_MODE` controls this:
 
-Cookies expire. If syncs start failing with a 401, copy a fresh one and restart the container.
-If BGG has issued you a bearer token instead, put it in `BGG_TOKEN` and leave `BGG_COOKIE` empty.
+- `auto` (default) — plain HTTP first, switching to the browser when BGG demands credentials
+- `browser` — always use the bundled browser
+- `http` — never use it; requires `BGG_COOKIE` and usually fails behind Cloudflare
+
+The `BGG_COOKIE`, `BGG_USER_AGENT` and `BGG_TOKEN` settings only apply to `http` mode and can be
+left empty.
 
 To check credentials without running a full sync:
 
@@ -54,8 +54,7 @@ combination BGG accepts.
 
 ## Running it (Docker Desktop on Windows)
 
-1. Copy `.env.example` to `.env` and fill in your BGG username, the two login credentials, and
-   `BGG_COOKIE` (see above):
+1. Copy `.env.example` to `.env` and fill in your BGG username and the two login credentials:
 
    ```
    cp .env.example .env

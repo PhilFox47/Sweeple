@@ -1,7 +1,8 @@
 import { XMLParser } from "fast-xml-parser";
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
-const BASE = "https://boardgamegeek.com/xmlapi2";
+export const BGG_ORIGIN = process.env.BGG_ORIGIN ?? "https://boardgamegeek.com";
+const BASE = `${BGG_ORIGIN}/xmlapi2`;
 
 export interface BggRequestOptions {
   signal?: AbortSignal;
@@ -100,10 +101,10 @@ export function credentialWarning(): string | null {
 
 // Bot filtering and network middleboxes both answer with terse status codes, so record what
 // actually came back. Which one it is decides the fix, and it is only visible in the container.
-function logRejection(url: string, res: Response, body: string) {
+function logRejection(url: string, res: { status: number; header: (n: string) => string | null }, body: string) {
   const interesting = ["server", "content-type", "cf-ray", "cf-mitigated", "set-cookie", "www-authenticate", "via", "x-cache"];
   const headers = interesting
-    .map((h) => (res.headers.get(h) ? `${h}: ${res.headers.get(h)}` : null))
+    .map((h) => (res.header(h) ? `${h}: ${res.header(h)}` : null))
     .filter(Boolean)
     .join(" | ");
   console.warn(
@@ -119,6 +120,33 @@ function isQueuedBody(xml: string): boolean {
   return /<message>/i.test(xml) && /(accepted|being processed|will be processed|try again)/i.test(xml);
 }
 
+interface Fetched {
+  status: number;
+  body: string;
+  header: (name: string) => string | null;
+}
+
+// "auto" starts on plain HTTP and switches to the browser the moment BGG demands credentials,
+// which is both cheaper when HTTP works and self-healing when it does not.
+type FetchMode = "auto" | "http" | "browser";
+const FETCH_MODE = (process.env.BGG_FETCH_MODE as FetchMode) || "auto";
+let useBrowser = FETCH_MODE === "browser";
+
+async function httpFetch(url: string, cookie: string, signal?: AbortSignal): Promise<Fetched> {
+  const res = await fetch(url, {
+    headers: { ...BROWSER_HEADERS, ...authHeaders(), ...(cookie ? { Cookie: cookie } : {}) },
+    redirect: "follow",
+    signal,
+  });
+  return { status: res.status, body: await res.text(), header: (n) => res.headers.get(n) };
+}
+
+async function browserFetch(url: string): Promise<Fetched> {
+  const { fetchViaBrowser } = await import("./browser.js");
+  const res = await fetchViaBrowser(url);
+  return { status: res.status, body: res.body, header: (n) => res.headers[n.toLowerCase()] ?? null };
+}
+
 async function fetchWithRetry(url: string, label: string, options: BggRequestOptions = {}): Promise<string> {
   const { signal, onProgress } = options;
   const deadline = Date.now() + MAX_WAIT_MS;
@@ -129,13 +157,9 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
   for (let attempt = 1; ; attempt++) {
     if (signal?.aborted) throw new SyncCancelledError();
 
-    const res = await fetch(url, {
-      headers: { ...BROWSER_HEADERS, ...authHeaders(), ...(cookie ? { Cookie: cookie } : {}) },
-      redirect: "follow",
-      signal,
-    });
+    const res = useBrowser ? await browserFetch(url) : await httpFetch(url, cookie, signal);
 
-    const setCookie = res.headers.get("set-cookie");
+    const setCookie = res.header("set-cookie");
     if (setCookie) {
       const jar = setCookie
         .split(/,(?=[^;]+?=)/)
@@ -146,36 +170,37 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
 
     let waitReason: string | null = null;
 
-    if (res.ok) {
-      const text = await res.text();
-      if (!isQueuedBody(text)) return text;
-      waitReason = `BGG is preparing the ${label}`;
-    } else if (res.status === 202) {
-      await res.body?.cancel().catch(() => {});
+    if (res.status >= 200 && res.status < 300) {
+      if (!isQueuedBody(res.body)) return res.body;
       waitReason = `BGG is preparing the ${label}`;
     } else if (res.status === 429 || res.status === 401 || res.status === 403 || res.status >= 500) {
-      // BGG throttles with these while an export is still being built; keep asking politely.
       // Log the first one and then occasionally, so a persistent block is visible in the logs.
-      const body = await res.text().catch(() => "");
-      if (attempt === 1 || attempt % 6 === 0) logRejection(url, res, body);
+      if (attempt === 1 || attempt % 6 === 0) logRejection(url, res, res.body);
 
-      // An explicit auth challenge is a statement, not a queue. Retrying it never succeeds.
-      const challenge = res.headers.get("www-authenticate");
+      // An explicit auth challenge is a statement, not a queue — retrying it never succeeds.
+      // Cloudflare ties clearance to the TLS fingerprint, so no header or cookie fixes this
+      // from Node; a real browser can, and in "auto" mode that is what we switch to.
+      const challenge = res.header("www-authenticate");
       if (challenge && (res.status === 401 || res.status === 403)) {
+        if (!useBrowser && FETCH_MODE === "auto") {
+          useBrowser = true;
+          onProgress?.("BGG demanded credentials — switching to the built-in browser");
+          console.warn(`[bgg] ${res.status} ${challenge} over plain HTTP; retrying via Chromium.`);
+          continue;
+        }
         throw new Error(
           `BGG requires credentials for the ${label} request (HTTP ${res.status}, ${challenge}). ` +
-            (hasBggCredentials()
-              ? credentialWarning() ??
-                "The configured BGG_TOKEN/BGG_COOKIE was rejected — it may have expired; copy a fresh one from your browser."
-              : "Set BGG_COOKIE (copy the boardgamegeek.com cookie header from your browser) or BGG_TOKEN in your .env, then restart.")
+            (useBrowser
+              ? "Even the built-in browser was refused. If you are logged out of BGG in it, the " +
+                "collection may be private; otherwise BGG may be blocking this host."
+              : "Set BGG_FETCH_MODE=auto (the default) to let it retry through the built-in browser.")
         );
       }
 
       waitReason = `BGG is throttling the ${label} request (HTTP ${res.status})`;
     } else {
-      const raw = await res.text().catch(() => "");
-      logRejection(url, res, raw);
-      const body = raw.replace(/\s+/g, " ").trim().slice(0, 300);
+      logRejection(url, res, res.body);
+      const body = res.body.replace(/\s+/g, " ").trim().slice(0, 300);
       throw new Error(`BGG request failed (${res.status}) for ${url}.${body ? ` BGG said: ${body}` : ""}`);
     }
 

@@ -7,6 +7,7 @@ services:
       - "${HOST_PORT:-8080}:8080"
     environment:
       BGG_USERNAME: ${BGG_USERNAME}
+      BGG_FETCH_MODE: ${BGG_FETCH_MODE:-auto}
       BGG_COOKIE: ${BGG_COOKIE:-}
       BGG_USER_AGENT: ${BGG_USER_AGENT:-}
       BGG_TOKEN: ${BGG_TOKEN:-}
