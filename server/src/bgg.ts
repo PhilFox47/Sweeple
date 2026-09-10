@@ -60,26 +60,23 @@ export interface CollectionItem {
 }
 
 export async function fetchCollection(username: string): Promise<CollectionItem[]> {
-  const url = `${BASE}/collection?username=${encodeURIComponent(username)}&own=1&excludesubtype=boardgameexpansion&stats=0`;
-  const expansionsUrl = `${BASE}/collection?username=${encodeURIComponent(username)}&own=1&subtype=boardgameexpansion&stats=0`;
+  // One request for the whole collection. BGG queues collection exports per user, so asking
+  // twice at once (games and expansions separately) makes it reject one of them. The default
+  // response already includes expansions, each item tagged with its own subtype.
+  const xml = await fetchWithRetry(
+    `${BASE}/collection?username=${encodeURIComponent(username)}&own=1`
+  );
+  assertNoXmlError(xml, "collection");
 
-  const [baseXml, expansionXml] = await Promise.all([fetchWithRetry(url), fetchWithRetry(expansionsUrl)]);
-
-  const parseItems = (xml: string, isExpansion: boolean): CollectionItem[] => {
-    assertNoXmlError(xml, "collection");
-    const doc = parser.parse(xml);
-    const items = toArray(doc?.items?.item);
-    return items.map((item: any) => ({
-      bggId: Number(item["@_objectid"]),
-      name: typeof item.name === "object" ? item.name["#text"] ?? item.name : item.name,
-      yearPublished: item.yearpublished !== undefined ? Number(item.yearpublished) : null,
-      thumbnail: item.thumbnail ?? null,
-      image: item.image ?? null,
-      isExpansion,
-    }));
-  };
-
-  return [...parseItems(baseXml, false), ...parseItems(expansionXml, true)];
+  const doc = parser.parse(xml);
+  return toArray(doc?.items?.item).map((item: any) => ({
+    bggId: Number(item["@_objectid"]),
+    name: typeof item.name === "object" ? item.name["#text"] ?? item.name : item.name,
+    yearPublished: item.yearpublished !== undefined ? Number(item.yearpublished) : null,
+    thumbnail: item.thumbnail ?? null,
+    image: item.image ?? null,
+    isExpansion: item["@_subtype"] === "boardgameexpansion",
+  }));
 }
 
 export interface GameDetails {
