@@ -7,36 +7,64 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Node's fetch defaults to "User-Agent: node", which BGG's bot filtering treats poorly.
-const USER_AGENT = "Sweeple/1.0 (self-hosted board game picker; https://github.com/PhilFox47/Sweeple)";
+// Node's fetch sends "User-Agent: node", which BGG's bot filtering rejects outright.
+// The same URLs succeed from a browser, so present as one.
+const BROWSER_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  Accept: "text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+};
 
-async function fetchWithRetry(url: string, maxAttempts = 8): Promise<string> {
+async function fetchWithRetry(url: string, maxAttempts = 10): Promise<string> {
+  // BGG queues a collection export on first request and serves it on a later one. A browser
+  // carries its cookies across that reload, so mirror that rather than arriving fresh each time.
+  let cookie = "";
+  let authFailures = 0;
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "text/xml, application/xml;q=0.9, */*;q=0.8" },
+      headers: cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS,
+      redirect: "follow",
     });
-    if (res.status === 202) {
-      // BGG queued the export; wait and retry.
-      await sleep(1500 * attempt);
+
+    const setCookie = res.headers.get("set-cookie");
+    if (setCookie) {
+      const jar = setCookie
+        .split(/,(?=[^;]+?=)/)
+        .map((c) => c.split(";")[0].trim())
+        .filter(Boolean);
+      if (jar.length) cookie = [cookie, ...jar].filter(Boolean).join("; ");
+    }
+
+    // 202 means "queued, ask again shortly"; 429 means slow down.
+    if (res.status === 202 || res.status === 429) {
+      await res.body?.cancel().catch(() => {});
+      await sleep((res.status === 429 ? 2500 : 1500) * attempt);
       continue;
     }
-    if (res.status === 429) {
-      await sleep(2000 * attempt);
+
+    // BGG intermittently answers 401/403 to non-browser-looking traffic even for public
+    // collections, so treat a few as transient before believing it is really a permissions problem.
+    if ((res.status === 401 || res.status === 403) && ++authFailures <= 3) {
+      await res.body?.cancel().catch(() => {});
+      await sleep(2000 * authFailures);
       continue;
     }
+
     if (!res.ok) {
       // BGG explains itself in the body, so surface it rather than just the status code.
       const body = (await res.text().catch(() => "")).trim().slice(0, 300);
       const hint =
         res.status === 401 || res.status === 403
-          ? " BGG returns this when the collection or play history is private, or the username does not exist." +
-            " Check the username, and set Privacy to public under BGG account settings."
+          ? " The collection may be private, the username may not exist, or BGG may be rate limiting this host." +
+            " If the same URL works in your browser, BGG is throttling — wait a few minutes and retry."
           : "";
       throw new Error(`BGG request failed (${res.status}) for ${url}.${hint}${body ? ` BGG said: ${body}` : ""}`);
     }
     return res.text();
   }
-  throw new Error(`BGG request kept returning 202/429 after ${maxAttempts} attempts: ${url}`);
+  throw new Error(`BGG kept queueing or throttling the request after ${maxAttempts} attempts: ${url}`);
 }
 
 // BGG reports some failures (e.g. an unknown username) as HTTP 200 with an <errors> body.
