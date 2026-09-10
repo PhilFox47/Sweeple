@@ -21,9 +21,33 @@ you (no push notifications, just live in-app updates), ready to play.
   account can add further (e.g. guest) accounts via `POST /api/users/guest` — the schema and login
   flow already support more than two users.
 
+## BGG authentication
+
+BGG's XML API rejects unauthenticated server requests with
+`401 WWW-Authenticate: Bearer realm="xml api"`. A browser gets through on cookies it already
+holds for boardgamegeek.com, so the container needs to be given the same thing:
+
+1. Open https://boardgamegeek.com in your browser and log in.
+2. F12 → Network tab → reload the page.
+3. Click the first request to boardgamegeek.com → Request Headers → `cookie`.
+4. Copy the whole value into `BGG_COOKIE` in your `.env`, on one line.
+
+Cookies expire. If syncs start failing with a 401, copy a fresh one and restart the container.
+If BGG has issued you a bearer token instead, put it in `BGG_TOKEN` and leave `BGG_COOKIE` empty.
+
+To check credentials without running a full sync:
+
+```
+docker compose exec sweeple node dist/diagnose.js
+```
+
+It probes the collection URL with and without your configured credentials and reports which
+combination BGG accepts.
+
 ## Running it (Docker Desktop on Windows)
 
-1. Copy `.env.example` to `.env` and fill in your BGG username and two login credentials:
+1. Copy `.env.example` to `.env` and fill in your BGG username, the two login credentials, and
+   `BGG_COOKIE` (see above):
 
    ```
    cp .env.example .env

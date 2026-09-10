@@ -37,7 +37,26 @@ const variants: { name: string; headers: Record<string, string> }[] = [
   },
 ];
 
-console.log(`Probing: ${url}\n`);
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+
+const cookie = process.env.BGG_COOKIE?.trim();
+const token = process.env.BGG_TOKEN?.trim();
+if (cookie) {
+  variants.push({ name: "with BGG_COOKIE", headers: { "User-Agent": BROWSER_UA, Cookie: cookie } });
+}
+if (token) {
+  variants.push({
+    name: "with BGG_TOKEN",
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Authorization: token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`,
+    },
+  });
+}
+
+console.log(`Probing: ${url}`);
+console.log(`Credentials configured: BGG_COOKIE=${cookie ? "yes" : "no"}, BGG_TOKEN=${token ? "yes" : "no"}\n`);
 
 // Does general internet egress work at all, or is something intercepting?
 try {
@@ -59,7 +78,9 @@ for (const variant of variants) {
     console.log(
       `    server: ${res.headers.get("server") ?? "?"} | cf-ray: ${res.headers.get("cf-ray") ?? "-"} | content-type: ${res.headers.get("content-type") ?? "?"}`
     );
-    if (res.headers.get("www-authenticate")) console.log(`    www-authenticate: ${res.headers.get("www-authenticate")}`);
+    if (res.headers.get("www-authenticate")) {
+      console.log(`    www-authenticate: ${res.headers.get("www-authenticate")}  <-- BGG wants credentials`);
+    }
     if (res.headers.get("via")) console.log(`    via: ${res.headers.get("via")} (a proxy is in the path)`);
     console.log(`    verdict: ${queued ? "QUEUED (retry works)" : items > 0 ? `OK — ${items} items` : "no items"}`);
     console.log(`    body: ${body.slice(0, 200)}\n`);

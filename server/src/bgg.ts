@@ -62,6 +62,23 @@ const BROWSER_HEADERS: Record<string, string> = {
   "Upgrade-Insecure-Requests": "1",
 };
 
+// BGG answers unauthenticated API requests with `WWW-Authenticate: Bearer realm="xml api"`.
+// A browser gets through on the cookies it already holds, so allow supplying either.
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const token = process.env.BGG_TOKEN?.trim();
+  if (token) headers.Authorization = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
+  return headers;
+}
+
+export function configuredCookie(): string {
+  return process.env.BGG_COOKIE?.trim() ?? "";
+}
+
+export function hasBggCredentials(): boolean {
+  return Boolean(process.env.BGG_TOKEN?.trim() || configuredCookie());
+}
+
 // Bot filtering and network middleboxes both answer with terse status codes, so record what
 // actually came back. Which one it is decides the fix, and it is only visible in the container.
 function logRejection(url: string, res: Response, body: string) {
@@ -87,14 +104,14 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
   const { signal, onProgress } = options;
   const deadline = Date.now() + MAX_WAIT_MS;
   // BGG hands out a session cookie with the queued export and expects it back, exactly as a
-  // browser reload would return it.
-  let cookie = "";
+  // browser reload would return it. Seeded with any cookie the operator supplied.
+  let cookie = configuredCookie();
 
   for (let attempt = 1; ; attempt++) {
     if (signal?.aborted) throw new SyncCancelledError();
 
     const res = await fetch(url, {
-      headers: cookie ? { ...BROWSER_HEADERS, Cookie: cookie } : BROWSER_HEADERS,
+      headers: { ...BROWSER_HEADERS, ...authHeaders(), ...(cookie ? { Cookie: cookie } : {}) },
       redirect: "follow",
       signal,
     });
@@ -122,10 +139,19 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
       // Log the first one and then occasionally, so a persistent block is visible in the logs.
       const body = await res.text().catch(() => "");
       if (attempt === 1 || attempt % 6 === 0) logRejection(url, res, body);
-      waitReason =
-        res.status === 401 || res.status === 403
-          ? `BGG is refusing the ${label} request (HTTP ${res.status}) — if this persists it is bot filtering, not queueing`
-          : `BGG is throttling the ${label} request (HTTP ${res.status})`;
+
+      // An explicit auth challenge is a statement, not a queue. Retrying it never succeeds.
+      const challenge = res.headers.get("www-authenticate");
+      if (challenge && (res.status === 401 || res.status === 403)) {
+        throw new Error(
+          `BGG requires credentials for the ${label} request (HTTP ${res.status}, ${challenge}). ` +
+            (hasBggCredentials()
+              ? "The configured BGG_TOKEN/BGG_COOKIE was rejected — it may have expired; copy a fresh one from your browser."
+              : "Set BGG_COOKIE (copy the boardgamegeek.com cookie header from your browser) or BGG_TOKEN in your .env, then restart.")
+        );
+      }
+
+      waitReason = `BGG is throttling the ${label} request (HTTP ${res.status})`;
     } else {
       const raw = await res.text().catch(() => "");
       logRejection(url, res, raw);
