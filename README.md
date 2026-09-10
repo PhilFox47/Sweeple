@@ -29,8 +29,16 @@ holds for boardgamegeek.com, so the container needs to be given the same thing:
 
 1. Open https://boardgamegeek.com in your browser and log in.
 2. F12 → Network tab → reload the page.
-3. Click the first request to boardgamegeek.com → Request Headers → `cookie`.
+3. Click the first request to boardgamegeek.com → **Request** Headers → `cookie`.
+   Not Response Headers, and not `document.cookie` in the console — that one silently omits
+   `HttpOnly` cookies such as `cf_clearance`.
 4. Copy the whole value into `BGG_COOKIE` in your `.env`, on one line.
+5. Run `navigator.userAgent` in that same browser's console and put the result in
+   `BGG_USER_AGENT`. **This is required if the cookie contains `cf_clearance`** — Cloudflare
+   binds that cookie to the User-Agent that obtained it, so a mismatch makes it useless.
+
+That cookie is an account credential. Keep `.env` out of version control (it is gitignored) and
+treat it like a password.
 
 Cookies expire. If syncs start failing with a 401, copy a fresh one and restart the container.
 If BGG has issued you a bearer token instead, put it in `BGG_TOKEN` and leave `BGG_COOKIE` empty.

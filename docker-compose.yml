@@ -8,6 +8,7 @@ services:
     environment:
       BGG_USERNAME: ${BGG_USERNAME}
       BGG_COOKIE: ${BGG_COOKIE:-}
+      BGG_USER_AGENT: ${BGG_USER_AGENT:-}
       BGG_TOKEN: ${BGG_TOKEN:-}
       USER1_USERNAME: ${USER1_USERNAME}
       USER1_PASSWORD: ${USER1_PASSWORD}

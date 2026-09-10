@@ -42,8 +42,12 @@ const BROWSER_UA =
 
 const cookie = process.env.BGG_COOKIE?.trim();
 const token = process.env.BGG_TOKEN?.trim();
+const configuredUA = process.env.BGG_USER_AGENT?.trim();
 if (cookie) {
-  variants.push({ name: "with BGG_COOKIE", headers: { "User-Agent": BROWSER_UA, Cookie: cookie } });
+  variants.push({
+    name: `with BGG_COOKIE (UA: ${configuredUA ? "BGG_USER_AGENT" : "default"})`,
+    headers: { "User-Agent": configuredUA || BROWSER_UA, Cookie: cookie },
+  });
 }
 if (token) {
   variants.push({
@@ -56,7 +60,24 @@ if (token) {
 }
 
 console.log(`Probing: ${url}`);
-console.log(`Credentials configured: BGG_COOKIE=${cookie ? "yes" : "no"}, BGG_TOKEN=${token ? "yes" : "no"}\n`);
+console.log(
+  `Credentials configured: BGG_COOKIE=${cookie ? "yes" : "no"}, BGG_USER_AGENT=${configuredUA ? "yes" : "no"}, BGG_TOKEN=${token ? "yes" : "no"}`
+);
+if (cookie) {
+  const names = cookie
+    .split(";")
+    .map((c) => c.split("=")[0].trim())
+    .filter(Boolean);
+  console.log(`Cookie contains: ${names.join(", ")}`);
+  if (names.includes("cf_clearance") && !configuredUA) {
+    console.log(
+      "WARNING: cf_clearance is present but BGG_USER_AGENT is not set. Cloudflare binds that\n" +
+        "         cookie to the User-Agent that obtained it, so it will be rejected. Set\n" +
+        "         BGG_USER_AGENT to that browser's navigator.userAgent value."
+    );
+  }
+}
+console.log("");
 
 // Does general internet egress work at all, or is something intercepting?
 try {

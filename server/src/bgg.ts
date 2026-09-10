@@ -45,9 +45,13 @@ function sleep(ms: number, signal?: AbortSignal) {
 
 // Node's fetch sends "User-Agent: node", which BGG's bot filtering rejects outright.
 // The same URLs succeed from a browser, so present as one.
+// Cloudflare binds cf_clearance to the exact User-Agent that obtained it, so when a cookie is
+// copied from a browser this must be set to that same browser's User-Agent or the cookie is void.
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+
 const BROWSER_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "User-Agent": DEFAULT_USER_AGENT,
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.9",
   "Cache-Control": "no-cache",
@@ -68,6 +72,8 @@ function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   const token = process.env.BGG_TOKEN?.trim();
   if (token) headers.Authorization = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
+  const userAgent = process.env.BGG_USER_AGENT?.trim();
+  if (userAgent) headers["User-Agent"] = userAgent;
   return headers;
 }
 
@@ -77,6 +83,19 @@ export function configuredCookie(): string {
 
 export function hasBggCredentials(): boolean {
   return Boolean(process.env.BGG_TOKEN?.trim() || configuredCookie());
+}
+
+// The most likely way a copied cookie silently fails.
+export function credentialWarning(): string | null {
+  const cookie = configuredCookie();
+  if (cookie.includes("cf_clearance") && !process.env.BGG_USER_AGENT?.trim()) {
+    return (
+      "BGG_COOKIE contains cf_clearance but BGG_USER_AGENT is not set. Cloudflare ties that " +
+      "cookie to the browser that obtained it, so copy your browser's User-Agent into " +
+      "BGG_USER_AGENT (run `navigator.userAgent` in the browser console) or the cookie is ignored."
+    );
+  }
+  return null;
 }
 
 // Bot filtering and network middleboxes both answer with terse status codes, so record what
@@ -146,7 +165,8 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
         throw new Error(
           `BGG requires credentials for the ${label} request (HTTP ${res.status}, ${challenge}). ` +
             (hasBggCredentials()
-              ? "The configured BGG_TOKEN/BGG_COOKIE was rejected — it may have expired; copy a fresh one from your browser."
+              ? credentialWarning() ??
+                "The configured BGG_TOKEN/BGG_COOKIE was rejected — it may have expired; copy a fresh one from your browser."
               : "Set BGG_COOKIE (copy the boardgamegeek.com cookie header from your browser) or BGG_TOKEN in your .env, then restart.")
         );
       }
