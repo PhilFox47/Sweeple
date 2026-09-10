@@ -37,7 +37,6 @@ await app.register(syncRoutes);
 
 await app.register(fastifyStatic, {
   root: CLIENT_DIST,
-  wildcard: false,
 });
 
 app.setNotFoundHandler((request, reply) => {
