@@ -30,7 +30,12 @@ export async function runSync(): Promise<void> {
   try {
     const collection = await fetchCollection(username);
     const details = await fetchGameDetails(collection.map((c) => c.bggId));
-    const playStats = await fetchPlayStats(username);
+    // Play history can be private even when the collection is public. It only powers the
+    // "not played recently" filter, so a failure here must not sink the whole sync.
+    const playStats = await fetchPlayStats(username).catch((err) => {
+      console.warn(`[sync] Could not fetch BGG play stats: ${err instanceof Error ? err.message : err}`);
+      return new Map<number, { bggId: number; numPlays: number; lastPlayedAt: string | null }>();
+    });
     const detailsById = new Map(details.map((d) => [d.bggId, d]));
     const collectionIds = new Set(collection.map((c) => c.bggId));
 

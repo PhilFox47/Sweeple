@@ -7,9 +7,14 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Node's fetch defaults to "User-Agent: node", which BGG's bot filtering treats poorly.
+const USER_AGENT = "Sweeple/1.0 (self-hosted board game picker; https://github.com/PhilFox47/Sweeple)";
+
 async function fetchWithRetry(url: string, maxAttempts = 8): Promise<string> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT, Accept: "text/xml, application/xml;q=0.9, */*;q=0.8" },
+    });
     if (res.status === 202) {
       // BGG queued the export; wait and retry.
       await sleep(1500 * attempt);
@@ -20,11 +25,24 @@ async function fetchWithRetry(url: string, maxAttempts = 8): Promise<string> {
       continue;
     }
     if (!res.ok) {
-      throw new Error(`BGG request failed (${res.status}): ${url}`);
+      // BGG explains itself in the body, so surface it rather than just the status code.
+      const body = (await res.text().catch(() => "")).trim().slice(0, 300);
+      const hint =
+        res.status === 401 || res.status === 403
+          ? " BGG returns this when the collection or play history is private, or the username does not exist." +
+            " Check the username, and set Privacy to public under BGG account settings."
+          : "";
+      throw new Error(`BGG request failed (${res.status}) for ${url}.${hint}${body ? ` BGG said: ${body}` : ""}`);
     }
     return res.text();
   }
   throw new Error(`BGG request kept returning 202/429 after ${maxAttempts} attempts: ${url}`);
+}
+
+// BGG reports some failures (e.g. an unknown username) as HTTP 200 with an <errors> body.
+function assertNoXmlError(xml: string, context: string) {
+  const match = xml.match(/<error>[\s\S]*?<message>([\s\S]*?)<\/message>/i);
+  if (match) throw new Error(`BGG rejected the ${context} request: ${match[1].trim()}`);
 }
 
 function toArray<T>(value: T | T[] | undefined): T[] {
@@ -48,6 +66,7 @@ export async function fetchCollection(username: string): Promise<CollectionItem[
   const [baseXml, expansionXml] = await Promise.all([fetchWithRetry(url), fetchWithRetry(expansionsUrl)]);
 
   const parseItems = (xml: string, isExpansion: boolean): CollectionItem[] => {
+    assertNoXmlError(xml, "collection");
     const doc = parser.parse(xml);
     const items = toArray(doc?.items?.item);
     return items.map((item: any) => ({
