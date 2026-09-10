@@ -1,0 +1,468 @@
+:root {
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --text: #241f1a;
+  --text-muted: #6b6157;
+  --accent: #e2574c;
+  --accent-dark: #c43e34;
+  --like: #3fae6a;
+  --dislike: #e2574c;
+  --border: #e8e1d8;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #191512;
+    --surface: #241f1a;
+    --text: #f3ece3;
+    --text-muted: #a99e91;
+    --border: #352e28;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.primary-button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1.2rem;
+  font-weight: 600;
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+}
+
+.secondary-button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  color: var(--text);
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+}
+
+/* Login */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-card h1 {
+  margin: 0 0 0.25rem;
+}
+
+.login-subtitle {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.form-error {
+  color: var(--dislike);
+  font-size: 0.9rem;
+}
+
+/* App shell */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+}
+
+.app-header h1 {
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.current-user {
+  color: var(--text-muted);
+}
+
+.sync-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.sync-status-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab-bar button {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.tab-bar button.tab-active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.app-main {
+  flex: 1;
+}
+
+/* Swipe deck */
+.swipe-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.swipe-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.card-stack {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  height: 480px;
+}
+
+.tinder-card {
+  position: absolute;
+  inset: 0;
+}
+
+.game-card {
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.game-card-image {
+  flex: 1;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-card-image-fallback {
+  padding: 1rem;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.game-card-info {
+  padding: 1rem;
+}
+
+.game-card-info h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.game-card-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.game-card-categories {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.game-card-last-played {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+
+.swipe-actions {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.round-button {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  font-size: 1.6rem;
+  color: white;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.round-button.like {
+  background: var(--like);
+}
+
+.round-button.dislike {
+  background: var(--dislike);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 2rem 1rem;
+}
+
+/* Filters */
+.filter-panel {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 50;
+  overflow-y: auto;
+  padding: 1.5rem 1.25rem;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.filter-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 1.1rem;
+}
+
+.filter-range {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.chip-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.filter-actions .primary-button,
+.filter-actions .secondary-button {
+  flex: 1;
+}
+
+/* Matches */
+.matches-page h2 {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin: 1.2rem 0 0.6rem;
+}
+
+.match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.match-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.75rem;
+}
+
+.match-card img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.match-card-info {
+  flex: 1;
+}
+
+.match-card-info h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.match-card-played {
+  opacity: 0.7;
+}
+
+/* Toasts */
+.toast-stack {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 100;
+  width: calc(100% - 2rem);
+  max-width: 420px;
+}
+
+.toast {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.9rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.toast-match {
+  background: var(--accent);
+}
+
+.toast-info {
+  background: #3a3530;
+}
+
+.toast-error {
+  background: var(--dislike);
+}
+
+@media (max-width: 420px) {
+  .card-stack {
+    height: 420px;
+  }
+}

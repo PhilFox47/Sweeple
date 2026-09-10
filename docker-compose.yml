@@ -1,0 +1,20 @@
+services:
+  sweeple:
+    build: .
+    container_name: sweeple
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    environment:
+      BGG_USERNAME: ${BGG_USERNAME}
+      USER1_USERNAME: ${USER1_USERNAME}
+      USER1_PASSWORD: ${USER1_PASSWORD}
+      USER1_DISPLAY_NAME: ${USER1_DISPLAY_NAME}
+      USER2_USERNAME: ${USER2_USERNAME}
+      USER2_PASSWORD: ${USER2_PASSWORD}
+      USER2_DISPLAY_NAME: ${USER2_DISPLAY_NAME}
+    volumes:
+      - sweeple-data:/data
+
+volumes:
+  sweeple-data:

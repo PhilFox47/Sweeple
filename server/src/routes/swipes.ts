@@ -1,0 +1,58 @@
+import type { FastifyInstance } from "fastify";
+import { db } from "../db.js";
+import { authenticate } from "../auth.js";
+import { broadcast } from "../ws.js";
+
+function reconcileMatch(gameId: number) {
+  const coreUsers = db.prepare("SELECT id FROM users WHERE role = 'core'").all() as { id: number }[];
+  if (coreUsers.length < 2) return;
+
+  const likes = db
+    .prepare("SELECT user_id FROM swipes WHERE game_id = ? AND decision = 'like'")
+    .all(gameId) as { user_id: number }[];
+  const likedUserIds = new Set(likes.map((l) => l.user_id));
+  const allCoreLiked = coreUsers.every((u) => likedUserIds.has(u.id));
+
+  const existingMatch = db.prepare("SELECT id, played_at FROM matches WHERE game_id = ?").get(gameId) as
+    | { id: number; played_at: string | null }
+    | undefined;
+
+  if (allCoreLiked && !existingMatch) {
+    db.prepare("INSERT INTO matches (game_id) VALUES (?)").run(gameId);
+    const game = db.prepare("SELECT name, thumbnail FROM games WHERE id = ?").get(gameId) as
+      | { name: string; thumbnail: string | null }
+      | undefined;
+    broadcast({ type: "match", gameId, gameName: game?.name ?? "Unknown game", thumbnail: game?.thumbnail ?? null });
+  } else if (!allCoreLiked && existingMatch && !existingMatch.played_at) {
+    db.prepare("DELETE FROM matches WHERE id = ?").run(existingMatch.id);
+  }
+}
+
+export default async function swipesRoutes(app: FastifyInstance) {
+  app.post<{ Body: { gameId: number; decision: "like" | "dislike" } }>(
+    "/api/swipes",
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const { gameId, decision } = request.body ?? ({} as any);
+      if (!gameId || (decision !== "like" && decision !== "dislike")) {
+        return reply.code(400).send({ error: "gameId and decision ('like'|'dislike') are required" });
+      }
+      db.prepare(
+        `INSERT INTO swipes (user_id, game_id, decision) VALUES (?, ?, ?)
+         ON CONFLICT(user_id, game_id) DO UPDATE SET decision = excluded.decision, created_at = datetime('now')`
+      ).run(request.user!.id, gameId, decision);
+
+      reconcileMatch(gameId);
+      return { ok: true };
+    }
+  );
+
+  app.post("/api/swipes/reset", { preHandler: authenticate }, async (request) => {
+    const gameIds = (
+      db.prepare("SELECT game_id FROM swipes WHERE user_id = ?").all(request.user!.id) as { game_id: number }[]
+    ).map((r) => r.game_id);
+    db.prepare("DELETE FROM swipes WHERE user_id = ?").run(request.user!.id);
+    for (const gameId of gameIds) reconcileMatch(gameId);
+    return { ok: true };
+  });
+}
