@@ -48,9 +48,34 @@ function sleep(ms: number, signal?: AbortSignal) {
 const BROWSER_HEADERS: Record<string, string> = {
   "User-Agent":
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-  Accept: "text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,*/*;q=0.8",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
+  "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
 };
+
+// Bot filtering and network middleboxes both answer with terse status codes, so record what
+// actually came back. Which one it is decides the fix, and it is only visible in the container.
+function logRejection(url: string, res: Response, body: string) {
+  const interesting = ["server", "content-type", "cf-ray", "cf-mitigated", "set-cookie", "www-authenticate", "via", "x-cache"];
+  const headers = interesting
+    .map((h) => (res.headers.get(h) ? `${h}: ${res.headers.get(h)}` : null))
+    .filter(Boolean)
+    .join(" | ");
+  console.warn(
+    `[bgg] HTTP ${res.status} from ${url}\n` +
+      `[bgg] headers: ${headers || "(none of interest)"}\n` +
+      `[bgg] body: ${body.replace(/\s+/g, " ").trim().slice(0, 400) || "(empty)"}`
+  );
+}
 
 // BGG announces a queued export as a <message> body — sometimes with 202, but also with a
 // plain 200. Treated as success it parses to zero items and silently wipes the collection.
@@ -94,10 +119,17 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
       waitReason = `BGG is preparing the ${label}`;
     } else if (res.status === 429 || res.status === 401 || res.status === 403 || res.status >= 500) {
       // BGG throttles with these while an export is still being built; keep asking politely.
-      await res.body?.cancel().catch(() => {});
-      waitReason = `BGG is throttling the ${label} request (HTTP ${res.status})`;
+      // Log the first one and then occasionally, so a persistent block is visible in the logs.
+      const body = await res.text().catch(() => "");
+      if (attempt === 1 || attempt % 6 === 0) logRejection(url, res, body);
+      waitReason =
+        res.status === 401 || res.status === 403
+          ? `BGG is refusing the ${label} request (HTTP ${res.status}) — if this persists it is bot filtering, not queueing`
+          : `BGG is throttling the ${label} request (HTTP ${res.status})`;
     } else {
-      const body = (await res.text().catch(() => "")).trim().slice(0, 300);
+      const raw = await res.text().catch(() => "");
+      logRejection(url, res, raw);
+      const body = raw.replace(/\s+/g, " ").trim().slice(0, 300);
       throw new Error(`BGG request failed (${res.status}) for ${url}.${body ? ` BGG said: ${body}` : ""}`);
     }
 
