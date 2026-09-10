@@ -56,7 +56,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     ...options,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...options.headers },
+    // Fastify rejects a JSON content-type with an empty body, so only send it when there is one.
+    headers: options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
