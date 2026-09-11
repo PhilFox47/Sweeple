@@ -6,6 +6,15 @@ import GameCard from "../components/GameCard";
 
 type SwipeDirection = "left" | "right" | "up" | "down";
 
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 export default function Swipe({ refreshToken }: { refreshToken: number }) {
   const [deck, setDeck] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +29,7 @@ export default function Swipe({ refreshToken }: { refreshToken: number }) {
       setError(null);
       try {
         const { games } = await api.deck(currentFilters);
-        setDeck(games);
+        setDeck(shuffle(games));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load games");
       } finally {
