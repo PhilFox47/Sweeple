@@ -21,6 +21,7 @@ interface GameRow {
   mechanics: string;
   best_players: string;
   recommended_players: string;
+  expansion_mode: string;
   num_plays: number;
   last_played_at: string | null;
   is_expansion: number;
@@ -50,8 +51,17 @@ function serializeGame(row: GameRow) {
     numPlays: row.num_plays,
     lastPlayedAt: row.last_played_at,
     isExpansion: !!row.is_expansion,
+    expansionMode: (row.expansion_mode ?? "auto") as "auto" | "hidden" | "standalone",
   };
 }
+
+/** Resolves the manual override against BGG's flag. */
+export const EFFECTIVE_EXPANSION = `
+  (CASE expansion_mode
+     WHEN 'hidden' THEN 1
+     WHEN 'standalone' THEN 0
+     ELSE is_expansion
+   END)`;
 
 interface GameFilters {
   playerCount?: number;
@@ -83,7 +93,9 @@ function buildWhere(filters: GameFilters): { clause: string; params: Record<stri
   const clauses: string[] = ["owned = 1"];
   const params: Record<string, unknown> = {};
 
-  if (!filters.includeExpansions) clauses.push("is_expansion = 0");
+  // A game counts as an expansion unless it has been marked standalone by hand, and counts as
+  // one regardless of BGG when it has been hidden by hand.
+  if (!filters.includeExpansions) clauses.push(`${EFFECTIVE_EXPANSION} = 0`);
   if (filters.playerCount !== undefined) {
     clauses.push("(min_players IS NULL OR min_players <= @playerCount)");
     clauses.push("(max_players IS NULL OR max_players >= @playerCount)");

@@ -904,6 +904,122 @@ textarea:focus {
   gap: 0.55rem;
 }
 
+/* -------------------------------------------------------------- expansions */
+
+.expansion-rows {
+  margin-top: 0.8rem;
+}
+
+.expansion-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-areas:
+    "thumb meta"
+    "modes modes";
+  align-items: center;
+  gap: 0.55rem 0.7rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.expansion-row:last-child {
+  border-bottom: none;
+}
+
+.expansion-row.is-busy {
+  opacity: 0.55;
+}
+
+.expansion-thumb {
+  grid-area: thumb;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.expansion-thumb-empty {
+  border: 1px solid var(--border);
+}
+
+.expansion-meta {
+  grid-area: meta;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.expansion-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.expansion-sub {
+  font-size: 0.74rem;
+  color: var(--text-faint);
+}
+
+.expansion-state {
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 0.1rem;
+}
+
+.expansion-state.is-shown {
+  color: var(--like);
+}
+
+.expansion-state.is-hidden {
+  color: var(--text-faint);
+}
+
+.segmented {
+  grid-area: modes;
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.segment {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.14s var(--ease);
+}
+
+.segment:active {
+  transform: scale(0.96);
+}
+
+.segment-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+}
+
+/* Wide enough to put the toggle beside the name instead of under it. */
+@media (min-width: 560px) {
+  .expansion-row {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas: "thumb meta modes";
+  }
+
+  .segmented {
+    width: 280px;
+  }
+}
+
 /* ---------------------------------------------------------------- matches */
 
 .section-heading {

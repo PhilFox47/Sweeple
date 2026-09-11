@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Filters, type Game, type Round } from "../api";
 import DeckCard, { type SwipeDirection } from "../components/DeckCard";
 import FilterSheet from "../components/FilterSheet";
@@ -29,35 +29,54 @@ function orderDeck(games: Game[], playerCount?: number): Game[] {
     .map((entry) => entry.game);
 }
 
-export default function Swipe({ refreshToken, round }: { refreshToken: number; round: Round | null }) {
+export default function Swipe({
+  refreshToken,
+  round,
+}: {
+  refreshToken: number;
+  /** undefined while the round is still loading — fetching before then races the filter in. */
+  round: Round | null | undefined;
+}) {
   const [deck, setDeck] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({});
   const [showFilters, setShowFilters] = useState(false);
   const cardRefs = useRef<Record<number, any>>({});
+  // Responses can land out of order; only the newest request may write the deck.
+  const requestId = useRef(0);
 
-  const loadDeck = useCallback(async (currentFilters: Filters, playerCount?: number) => {
+  /**
+   * The round's size is the default player count, overridable in the filter sheet. Derived in
+   * one place rather than copied into filter state, so there is never a moment where the deck
+   * is fetched without it.
+   */
+  const effectiveFilters: Filters = useMemo(
+    () => ({ ...filters, playerCount: filters.playerCount ?? round?.playerCount }),
+    [filters, round?.playerCount]
+  );
+
+  const loadDeck = useCallback(async (currentFilters: Filters) => {
+    const id = ++requestId.current;
     setLoading(true);
     setError(null);
     try {
       const { games } = await api.deck(currentFilters);
-      setDeck(orderDeck(games, playerCount));
+      if (id !== requestId.current) return;
+      setDeck(orderDeck(games, currentFilters.playerCount));
     } catch (err) {
+      if (id !== requestId.current) return;
       setError(err instanceof Error ? err.message : "Failed to load games");
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   }, []);
 
-  // A running round sets the player-count filter, which stays adjustable in the sheet.
   useEffect(() => {
-    if (round) setFilters((prev) => ({ ...prev, playerCount: round.playerCount }));
-  }, [round?.id, round?.playerCount]);
-
-  useEffect(() => {
-    loadDeck(filters, round?.playerCount);
-  }, [filters, loadDeck, refreshToken, round?.playerCount]);
+    // Wait for the round to resolve, otherwise the first fetch goes out unfiltered.
+    if (round === undefined) return;
+    loadDeck(effectiveFilters);
+  }, [effectiveFilters, loadDeck, refreshToken, round]);
 
   // Stable so the cards never rebuild their drag listeners: doing so mid-gesture resets the
   // drag origin and the card jumps back to the centre.
@@ -85,7 +104,7 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
   async function handleReset() {
     if (!confirm("Start your swipes over? Games you already decided on come back into the deck.")) return;
     await api.resetSwipes();
-    loadDeck(filters, round?.playerCount);
+    loadDeck(effectiveFilters);
   }
 
   // deck[0] is the card on top, so render the first few reversed: last in DOM paints highest.
@@ -108,9 +127,9 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
       {error && <div className="form-error">{error}</div>}
 
       <div className="deck">
-        {loading && <div className="skeleton-card" />}
+        {(loading || round === undefined) && <div className="skeleton-card" />}
 
-        {!loading && deck.length === 0 && (
+        {!loading && round !== undefined && deck.length === 0 && (
           <div className="empty-state">
             <div className="empty-emoji">🎲</div>
             <h3>Nothing left to swipe</h3>
@@ -119,6 +138,7 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
         )}
 
         {!loading &&
+          round !== undefined &&
           stackOrder.map((game) => (
             <DeckCard
               key={game.id}
@@ -152,7 +172,7 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
 
       {showFilters && (
         <FilterSheet
-          filters={filters}
+          filters={effectiveFilters}
           roundPlayerCount={round?.playerCount}
           onChange={setFilters}
           onClose={() => setShowFilters(false)}

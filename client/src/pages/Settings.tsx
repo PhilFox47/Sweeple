@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Player, type Round } from "../api";
 import Import from "./Import";
+import ManageExpansions from "../components/ManageExpansions";
 import SyncControl from "../components/SyncControl";
 
 export default function Settings({
@@ -180,6 +181,8 @@ export default function Settings({
           ))}
         </div>
       </section>
+
+      <ManageExpansions refreshToken={refreshToken} />
 
       <section className="panel">
         <h3>BoardGameGeek</h3>

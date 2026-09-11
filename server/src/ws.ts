@@ -2,9 +2,35 @@ import type { WebSocket } from "ws";
 
 const clients = new Set<WebSocket>();
 
+/**
+ * Reverse proxies close idle connections (nginx defaults to 60s), and a silently dead socket
+ * means missed matches. Ping regularly so the connection stays warm and dead peers are dropped.
+ */
+const HEARTBEAT_MS = 25_000;
+
 export function registerClient(socket: WebSocket) {
   clients.add(socket);
-  socket.on("close", () => clients.delete(socket));
+
+  let alive = true;
+  socket.on("pong", () => {
+    alive = true;
+  });
+
+  const heartbeat = setInterval(() => {
+    if (!alive) {
+      socket.terminate();
+      return;
+    }
+    alive = false;
+    socket.ping();
+  }, HEARTBEAT_MS);
+
+  const drop = () => {
+    clearInterval(heartbeat);
+    clients.delete(socket);
+  };
+  socket.on("close", drop);
+  socket.on("error", drop);
 }
 
 export type ServerEvent =

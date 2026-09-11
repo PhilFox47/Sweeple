@@ -14,7 +14,8 @@ let toastId = 0;
 
 export default function App() {
   const [user, setUser] = useState<CurrentUser | null | undefined>(undefined);
-  const [round, setRound] = useState<Round | null>(null);
+  // undefined until the first load resolves, so Swipe can wait rather than fetch unfiltered.
+  const [round, setRound] = useState<Round | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>("swipe");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -90,7 +91,14 @@ export default function App() {
     [pushToast, loadRound, loadMatches]
   );
 
-  useServerEvents(handleServerEvent);
+  // Refetch whenever the live connection comes back, so a match made while the phone was
+  // locked or the socket was dropped still shows up without a manual reload.
+  const resync = useCallback(() => {
+    loadRound();
+    loadMatches();
+  }, [loadRound, loadMatches]);
+
+  useServerEvents(handleServerEvent, resync);
 
   // Matches waiting to be played — the round's decisions are cleared when a new one starts,
   // so this is also "how many we've found tonight".
@@ -140,7 +148,9 @@ export default function App() {
 
       <div className={`round-strip ${round ? "" : "round-strip-idle"}`}>
         <i className="round-dot" />
-        {round ? (
+        {round === undefined ? (
+          <span>Loading round…</span>
+        ) : round ? (
           <span>
             <strong>{round.playerCount}</strong> playing ·{" "}
             {round.players.map((p) => p.displayName).join(", ")}
@@ -165,7 +175,7 @@ export default function App() {
         {tab === "settings" && user.isAdmin && (
           <div className="scroll-area">
             <Settings
-              round={round}
+              round={round ?? null}
               refreshToken={libraryRefresh}
               syncSignal={syncSignal}
               syncProgress={syncProgress}

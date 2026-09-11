@@ -29,6 +29,9 @@ function addColumnIfMissing(table: string, column: string, definition: string) {
 
 addColumnIfMissing("games", "best_players", "TEXT NOT NULL DEFAULT '[]'");
 addColumnIfMissing("games", "recommended_players", "TEXT NOT NULL DEFAULT '[]'");
+// Manual override of whether a game counts as an expansion. "auto" defers to BGG's own flag.
+// Deliberately never written by syncing or importing, so choices survive a library refresh.
+addColumnIfMissing("games", "expansion_mode", "TEXT NOT NULL DEFAULT 'auto'");
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");

@@ -9,17 +9,30 @@ export type ServerEvent =
   | { type: "players-changed" }
   | { type: "sync-finished"; gamesAdded: number; gamesUpdated: number; status: "success" | "error"; error?: string };
 
-export function useServerEvents(onEvent: (event: ServerEvent) => void) {
+/**
+ * Live updates, with the assumption that the socket will drop: phones suspend it when the screen
+ * locks and reverse proxies close idle connections. Anything broadcast while we were away is gone
+ * for good, so `onResync` fires whenever the connection is (re)established and whenever the tab
+ * becomes visible again — callers use it to refetch rather than trusting the event stream alone.
+ */
+export function useServerEvents(onEvent: (event: ServerEvent) => void, onResync?: () => void) {
   const handlerRef = useRef(onEvent);
+  const resyncRef = useRef(onResync);
   handlerRef.current = onEvent;
+  resyncRef.current = onResync;
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    let socket: WebSocket;
+    let socket: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout>;
+    let closed = false;
 
     function connect() {
+      if (closed) return;
       socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
+
+      socket.onopen = () => resyncRef.current?.();
+
       socket.onmessage = (event) => {
         try {
           handlerRef.current(JSON.parse(event.data));
@@ -27,14 +40,32 @@ export function useServerEvents(onEvent: (event: ServerEvent) => void) {
           // ignore malformed messages
         }
       };
+
       socket.onclose = () => {
-        reconnectTimer = setTimeout(connect, 2000);
+        if (!closed) reconnectTimer = setTimeout(connect, 2000);
       };
+
+      // A socket that errors is about to close; let onclose drive the retry.
+      socket.onerror = () => socket?.close();
+    }
+
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      resyncRef.current?.();
+      // Coming back from a suspended tab the socket is often already dead.
+      if (!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+        clearTimeout(reconnectTimer);
+        connect();
+      }
     }
 
     connect();
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
+      closed = true;
       clearTimeout(reconnectTimer);
+      document.removeEventListener("visibilitychange", onVisible);
       socket?.close();
     };
   }, []);

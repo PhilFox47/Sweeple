@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./db.js";
 import authRoutes from "./routes/auth.js";
+import expansionRoutes from "./routes/expansions.js";
 import gamesRoutes from "./routes/games.js";
 import importRoutes from "./routes/import.js";
 import matchesRoutes from "./routes/matches.js";
@@ -33,6 +34,7 @@ app.get("/ws", { websocket: true }, (socket) => {
 
 await app.register(authRoutes);
 await app.register(gamesRoutes);
+await app.register(expansionRoutes);
 await app.register(importRoutes);
 await app.register(swipesRoutes);
 await app.register(matchesRoutes);

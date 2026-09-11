@@ -20,6 +20,21 @@ export interface Game {
   numPlays: number;
   lastPlayedAt: string | null;
   isExpansion: boolean;
+  expansionMode: ExpansionMode;
+}
+
+export type ExpansionMode = "auto" | "hidden" | "standalone";
+
+export interface Expansion {
+  id: number;
+  name: string;
+  thumbnail: string | null;
+  minPlayers: number | null;
+  maxPlayers: number | null;
+  isExpansion: boolean;
+  mode: ExpansionMode;
+  /** Whether the deck currently leaves it out, once the override is applied. */
+  hidden: boolean;
 }
 
 export interface Match {
@@ -135,6 +150,13 @@ export const api = {
   importLinks: () => request<ImportLinks>("/api/import/links"),
   importXml: (xml: string) =>
     request<{ kind: string; message: string }>("/api/import", { method: "POST", body: JSON.stringify({ xml }) }),
+
+  expansions: () => request<{ expansions: Expansion[] }>("/api/expansions"),
+  setExpansionMode: (id: number, mode: ExpansionMode) =>
+    request<{ ok: true; id: number; mode: ExpansionMode }>(`/api/expansions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ mode }),
+    }),
 
   triggerSync: () => request<{ ok: true; started: boolean }>("/api/sync", { method: "POST" }),
   stopSync: () => request<{ ok: true; stopped: boolean }>("/api/sync/stop", { method: "POST" }),
