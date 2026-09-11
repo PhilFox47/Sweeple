@@ -240,12 +240,21 @@ select {
 
 .game-card-image {
   flex: 1;
-  background-size: cover;
-  background-position: center;
+  min-height: 0;
   background-color: var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.game-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Without this the browser's native image drag hijacks the swipe gesture. */
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 .game-card-image-fallback {

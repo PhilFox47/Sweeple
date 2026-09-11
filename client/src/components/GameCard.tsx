@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Game } from "../api";
 
 function playerRange(game: Game): string {
@@ -12,13 +13,19 @@ function weightLabel(weight: number | null): string {
 }
 
 export default function GameCard({ game }: { game: Game }) {
+  const [failed, setFailed] = useState(false);
+  // An <img> rather than a CSS background: BGG image URLs contain parentheses
+  // (…/filters:format(jpeg)/…), which an unquoted url() cannot express.
+  const src = game.image ?? game.thumbnail;
+
   return (
     <div className="game-card">
-      <div
-        className="game-card-image"
-        style={{ backgroundImage: game.image ? `url(${game.image})` : undefined }}
-      >
-        {!game.image && <div className="game-card-image-fallback">{game.name}</div>}
+      <div className="game-card-image">
+        {src && !failed ? (
+          <img src={src} alt={game.name} draggable={false} onError={() => setFailed(true)} />
+        ) : (
+          <div className="game-card-image-fallback">{game.name}</div>
+        )}
       </div>
       <div className="game-card-info">
         <h2>{game.name}</h2>
