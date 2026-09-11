@@ -36,6 +36,7 @@ export interface Match {
 
 export interface ImportLinks {
   username: string;
+  hasToken: boolean;
   collectionUrl: string;
   playsUrl: string;
   detailBatches: { url: string; count: number }[];

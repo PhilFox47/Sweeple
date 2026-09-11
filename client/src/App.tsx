@@ -105,6 +105,12 @@ export default function App() {
         )}
       </main>
 
+      <footer className="app-footer">
+        <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
+          Powered by BGG
+        </a>
+      </footer>
+
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
     </div>
   );

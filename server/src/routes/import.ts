@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { authenticate } from "../auth.js";
-import { collectionUrl, parseCollectionXml, parsePlaysXml, parseThingXml, thingUrl } from "../bgg.js";
+import { collectionUrl, configuredToken, parseCollectionXml, parsePlaysXml, parseThingXml, thingUrl } from "../bgg.js";
 import { applyCollection, applyDetails, applyPlays, gamesMissingDetails } from "../store.js";
 import { db } from "../db.js";
 import { broadcast } from "../ws.js";
@@ -32,6 +32,7 @@ export default async function importRoutes(app: FastifyInstance) {
 
     return {
       username,
+      hasToken: Boolean(configuredToken()),
       collectionUrl: collectionUrl(username),
       playsUrl: `https://boardgamegeek.com/xmlapi2/plays?username=${encodeURIComponent(username)}`,
       detailBatches,

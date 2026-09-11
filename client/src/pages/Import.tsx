@@ -62,10 +62,17 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
 
   return (
     <div className="import-page">
-      <p className="import-intro">
-        BGG blocks automated requests, so fetch each link in your browser and paste the response
-        below. Sweeple works out which kind of response it is.
-      </p>
+      {links?.hasToken ? (
+        <p className="import-result">
+          A BGG API token is configured, so <strong>Sync with BGG</strong> can fetch everything
+          automatically. Manual import below stays available as a fallback.
+        </p>
+      ) : (
+        <p className="import-intro">
+          Without a BGG API token the server cannot call the API, so fetch each link in your browser
+          and paste the response below. Sweeple works out which kind of response it is.
+        </p>
+      )}
 
       <section className="import-step">
         <h3>1. Your collection</h3>
@@ -88,6 +95,9 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
         <p className="import-hint">
           Player counts, playtime, weight, categories and mechanics — and which entries are
           expansions. BGG caps this at 20 games per request, so there may be several links.
+          {" "}<strong>This endpoint requires an API token</strong>, which a browser cannot send —
+          opening these links without one returns "Unauthorized". Set BGG_TOKEN and use Sync
+          with BGG instead.
         </p>
         {links && links.gamesTotal > 0 && (
           <p className="import-status">
@@ -104,7 +114,8 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
         <h3>3. Play history (optional)</h3>
         <p className="import-hint">
           Adds the dates behind the "not played recently" filter. Play counts already come from your
-          collection. If you have many plays, paste each page (add <code>&amp;page=2</code> and so on).
+          collection. Also token-only. If you have many plays, paste each page (add{" "}
+          <code>&amp;page=2</code> and so on).
         </p>
         {links && <LinkRow url={links.playsUrl} label="Play history" />}
       </section>

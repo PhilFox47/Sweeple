@@ -548,3 +548,21 @@ select {
   padding: 0.1rem 0.3rem;
   border-radius: 4px;
 }
+
+/* BGG's XML API terms require public-facing apps to credit and link back. */
+.app-footer {
+  text-align: center;
+  padding: 1.25rem 0 0.5rem;
+}
+
+.app-footer a {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: var(--accent);
+}

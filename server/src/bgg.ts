@@ -67,12 +67,20 @@ const BROWSER_HEADERS: Record<string, string> = {
   "Upgrade-Insecure-Requests": "1",
 };
 
-// BGG answers unauthenticated API requests with `WWW-Authenticate: Bearer realm="xml api"`.
-// A browser gets through on the cookies it already holds, so allow supplying either.
+export function configuredToken(): string {
+  return process.env.BGG_TOKEN?.trim() ?? "";
+}
+
+/**
+ * BGG requires a registered application token on nearly every XML API endpoint; the sole
+ * exemption is downloading your own collection while logged in to the site, which is why a
+ * collection URL works in a browser but /thing answers `WWW-Authenticate: Bearer realm="xml api"`.
+ * Per the API docs the header is exactly `Bearer`, one space, the token — no colon.
+ */
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
-  const token = process.env.BGG_TOKEN?.trim();
-  if (token) headers.Authorization = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
+  const token = configuredToken();
+  if (token) headers.Authorization = /^bearer\s/i.test(token) ? token : `Bearer ${token}`;
   const userAgent = process.env.BGG_USER_AGENT?.trim();
   if (userAgent) headers["User-Agent"] = userAgent;
   return headers;
@@ -182,6 +190,15 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
       // from Node; a real browser can, and in "auto" mode that is what we switch to.
       const challenge = res.header("www-authenticate");
       if (challenge && (res.status === 401 || res.status === 403)) {
+        // With a token configured this is BGG rejecting that token, so escalating to a browser
+        // would only hide the real problem behind a slower failure.
+        if (configuredToken()) {
+          throw new Error(
+            `BGG rejected the API token on the ${label} request (HTTP ${res.status}, ${challenge}). ` +
+              "Check BGG_TOKEN against https://boardgamegeek.com/applications — the token must belong " +
+              "to an approved application and be sent to boardgamegeek.com without a leading www."
+          );
+        }
         if (!useBrowser && FETCH_MODE === "auto") {
           useBrowser = true;
           onProgress?.("BGG demanded credentials — switching to the built-in browser");
@@ -189,11 +206,9 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
           continue;
         }
         throw new Error(
-          `BGG requires credentials for the ${label} request (HTTP ${res.status}, ${challenge}). ` +
-            (useBrowser
-              ? "Even the built-in browser was refused. If you are logged out of BGG in it, the " +
-                "collection may be private; otherwise BGG may be blocking this host."
-              : "Set BGG_FETCH_MODE=auto (the default) to let it retry through the built-in browser.")
+          `BGG requires an API token for the ${label} request (HTTP ${res.status}, ${challenge}). ` +
+            "Register an application at https://boardgamegeek.com/applications, create a token, " +
+            "and set BGG_TOKEN in your .env."
         );
       }
 

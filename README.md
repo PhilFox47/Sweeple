@@ -23,31 +23,33 @@ you (no push notifications, just live in-app updates), ready to play.
 
 ## Getting your games in
 
-BGG sits behind Cloudflare, which fingerprints the TLS handshake and serves a JavaScript
-challenge. Server-side requests get `401 WWW-Authenticate: Bearer realm="xml api"` while the same
-URL works in a browser, and a copied cookie does not help — `cf_clearance` is bound to the
-fingerprint that earned it.
+BGG's XML API requires a registered **application token** on nearly every endpoint. The only
+exemption is downloading your own collection while logged in to the site in a browser — which is
+exactly why a collection URL works in your browser while `/thing` answers
+`401 WWW-Authenticate: Bearer realm="xml api"`.
 
-So the **Import** tab does it manually, which is reliable and takes about a minute:
+Register an application at <https://boardgamegeek.com/applications>, create a token under
+"Tokens", and put it in `.env` as `BGG_TOKEN`. Sweeple sends it as `Authorization: Bearer <token>`
+on every request, server-side, and caches the results in SQLite — BGG asks that requests come from
+servers and be kept to a minimum, which the weekly schedule respects.
 
-1. **Collection** — open the link it gives you. If BGG says the request is being processed, reload
-   after a few seconds until the game list appears. Copy the whole page and paste it in.
-2. **Game details** — Sweeple then generates links for the games it has, 20 at a time. These add
-   player counts, playtime, weight, categories and mechanics, and identify which entries are
-   expansions. A collection response reports expansions as ordinary board games, so without this
-   step expansions show up in the swipe deck.
-3. **Play history** (optional) — adds the dates behind the "not played recently" filter. Play
-   counts already come from the collection response.
+With the token set, **Sync with BGG** fetches your collection, game details and play history
+automatically.
 
-Paste any of those responses into the same box; Sweeple works out which is which. Re-import at any
-time to pick up new games — existing swipes and matches are preserved, and a game that leaves your
-collection is marked not owned rather than deleted.
+### Manual import (fallback)
 
-### Automatic sync
+The **Import** tab still accepts pasted XML if you would rather not use a token, or to backfill
+without waiting for a sync. It hands you the API links and detects which response you paste —
+collection, thing or plays. Note that only the collection URL works in a browser without a token;
+the others need the `Authorization` header a browser cannot send.
 
-The `Sync with BGG` button and the weekly job still exist and drive a bundled Chromium to get past
-Cloudflare (`BGG_FETCH_MODE`: `auto`, `browser` or `http`). It works against a simulated challenge
-but has not been confirmed against BGG itself — manual import is the dependable path.
+Importing details matters for more than stats: a collection response reports every entry as
+subtype `boardgame`, including expansions like Wingspan: European Expansion. Only the `thing`
+endpoint distinguishes them, so without that step expansions appear in the swipe deck as if they
+were standalone games.
+
+Re-import or re-sync at any time. Existing swipes and matches are preserved, and a game that
+leaves your collection is marked not owned rather than deleted.
 
 ## Running it (Docker Desktop on Windows)
 
