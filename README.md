@@ -9,7 +9,8 @@ you (no push notifications, just live in-app updates), ready to play.
 ## How it works
 
 - **Profiles**: open the app and pick who you are — no passwords, it runs on your own network.
-  Phil and Leo are permanent profiles and the only ones who can reach Settings.
+  Phil and Leo are permanent profiles, created automatically, and the only ones who can reach
+  Settings. Their names are fixed in `server/src/db.ts`; change them there if you ever need to.
 - **Rounds**: a round is one sitting. An admin picks who is playing and starts it, which clears
   everyone's swipes. The deck is then filtered to games that play with that many people, and a
   game only becomes a match once *everybody in the round* has swiped right.
@@ -53,7 +54,7 @@ leaves your collection is marked not owned rather than deleted.
 
 ## Running it (Docker Desktop on Windows)
 
-1. Copy `.env.example` to `.env` and fill in your BGG username and the two login credentials:
+1. Copy `.env.example` to `.env` and fill in your BGG username and API token:
 
    ```
    cp .env.example .env

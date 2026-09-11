@@ -51,12 +51,21 @@ export function verifyPassword(password: string, stored: string): boolean {
  * manage rounds, players and syncing. Temporary players are added at role "guest".
  * Sign-in is by profile pick with no password, so the hash column is left empty.
  */
+const ADMINS: { username: string; displayName: string }[] = [
+  { username: "phil", displayName: "Phil" },
+  { username: "leo", displayName: "Leo" },
+];
+
 function seedAdmin(username: string, displayName: string) {
-  const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(username) as
-    | { id: number }
+  const existing = db.prepare("SELECT id, display_name FROM users WHERE username = ?").get(username) as
+    | { id: number; display_name: string }
     | undefined;
   if (existing) {
-    db.prepare("UPDATE users SET role = 'core' WHERE id = ?").run(existing.id);
+    // The names are fixed, so correct any left over from the old env-var seeding.
+    if (existing.display_name !== displayName) {
+      console.log(`[db] renamed profile "${existing.display_name}" to "${displayName}"`);
+    }
+    db.prepare("UPDATE users SET role = 'core', display_name = ? WHERE id = ?").run(displayName, existing.id);
     return;
   }
   db.prepare(
@@ -64,5 +73,22 @@ function seedAdmin(username: string, displayName: string) {
   ).run(username, displayName);
 }
 
-seedAdmin("phil", process.env.USER1_DISPLAY_NAME ?? "Phil");
-seedAdmin("leo", process.env.USER2_DISPLAY_NAME ?? "Leo");
+for (const admin of ADMINS) seedAdmin(admin.username, admin.displayName);
+
+/**
+ * Earlier versions seeded the permanent profiles from USER1_/USER2_ environment variables, so a
+ * database can still hold an admin under some other username. Those are duplicates of Phil and
+ * Leo and would show up as extra profiles in the picker, so drop them. Their swipes go too, but
+ * swipes are per-round and cleared whenever a round starts; match history is not tied to a user.
+ */
+const strays = db
+  .prepare(
+    `SELECT id, display_name FROM users
+     WHERE role = 'core' AND username NOT IN (${ADMINS.map(() => "?").join(",")})`
+  )
+  .all(...ADMINS.map((a) => a.username)) as { id: number; display_name: string }[];
+
+for (const stray of strays) {
+  db.prepare("DELETE FROM users WHERE id = ?").run(stray.id);
+  console.log(`[db] removed leftover profile "${stray.display_name}" (superseded by Phil and Leo)`);
+}
