@@ -47,21 +47,21 @@ export default function SyncControl({ syncSignal, progress }: { syncSignal: numb
   const inProgress = status?.inProgress ?? false;
 
   return (
-    <div className="sync-control">
+    <div className="row-actions">
       {inProgress ? (
-        <button className="secondary-button" onClick={handleStop} disabled={busy}>
+        <button className="btn btn-ghost" onClick={handleStop} disabled={busy}>
           Stop sync
         </button>
       ) : (
-        <button className="secondary-button" onClick={handleSync} disabled={busy}>
+        <button className="btn btn-ghost" onClick={handleSync} disabled={busy}>
           {busy ? "Starting…" : "Sync with BGG"}
         </button>
       )}
 
-      {inProgress && <span className="sync-status-text">{progress ?? "Syncing with BGG…"}</span>}
+      {inProgress && <span className="panel-hint">{progress ?? "Syncing with BGG…"}</span>}
       {error && <span className="form-error">{error}</span>}
       {!inProgress && !error && last && (
-        <span className="sync-status-text">
+        <span className="panel-hint">
           {last.status === "success"
             ? `Last synced ${new Date(last.finished_at ?? last.started_at).toLocaleString()} — ${last.games_added} added, ${last.games_updated} updated`
             : last.error === "Sync stopped"

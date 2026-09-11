@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type CurrentUser, type Round } from "./api";
 import Toasts, { type Toast } from "./components/Toasts";
+import { IconCards, IconHeart, IconSettings } from "./components/icons";
 import { useServerEvents, type ServerEvent } from "./hooks/useServerEvents";
 import Matches from "./pages/Matches";
 import ProfileSelect from "./pages/ProfileSelect";
@@ -42,19 +43,18 @@ export default function App() {
   const pushToast = useCallback((kind: Toast["kind"], message: string) => {
     const id = ++toastId;
     setToasts((prev) => [...prev, { id, kind, message }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 6000);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5500);
   }, []);
 
   const handleServerEvent = useCallback(
     (event: ServerEvent) => {
       if (event.type === "match") {
-        pushToast("match", `It's a match! You all liked "${event.gameName}" 🎉`);
+        pushToast("match", `It's a match — "${event.gameName}" 🎉`);
         setMatchesRefresh((n) => n + 1);
       } else if (event.type === "round-changed") {
         loadRound();
         setLibraryRefresh((n) => n + 1);
         setMatchesRefresh((n) => n + 1);
-        pushToast("info", "The swipe round was updated.");
       } else if (event.type === "players-changed") {
         setLibraryRefresh((n) => n + 1);
       } else if (event.type === "sync-started") {
@@ -69,11 +69,11 @@ export default function App() {
         setSyncSignal((n) => n + 1);
         setLibraryRefresh((n) => n + 1);
         if (event.status === "success") {
-          pushToast("info", `BGG sync complete: ${event.gamesAdded} added, ${event.gamesUpdated} updated.`);
+          pushToast("info", `Synced — ${event.gamesAdded} added, ${event.gamesUpdated} updated.`);
         } else if (event.error === "Sync stopped") {
           pushToast("info", "Sync stopped.");
         } else {
-          pushToast("error", `BGG sync failed: ${event.error}`);
+          pushToast("error", `Sync failed: ${event.error}`);
         }
       }
     },
@@ -88,7 +88,16 @@ export default function App() {
     setTab("swipe");
   }
 
-  if (user === undefined) return <div className="empty-state">Loading…</div>;
+  if (user === undefined) {
+    return (
+      <div className="profile-screen">
+        <div className="empty-state">
+          <div className="empty-emoji">🎲</div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <ProfileSelect
@@ -103,62 +112,78 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>🎲 Sweeple</h1>
-        <div className="app-header-right">
-          <span className="current-user">{user.displayName}</span>
-          <button className="link-button" onClick={handleSignOut}>
-            Switch
-          </button>
-        </div>
+        <h1 className="brand">
+          <span className="brand-mark">🎲</span>
+          Sweeple
+        </h1>
+        <button className="header-user" onClick={handleSignOut} aria-label={`Signed in as ${user.displayName}. Switch profile`}>
+          <span className={`avatar ${user.isAdmin ? "" : "avatar-guest"}`}>
+            {user.displayName.charAt(0).toUpperCase()}
+          </span>
+        </button>
       </header>
 
-      {round ? (
-        <div className="round-banner">
-          Round with {round.players.map((p) => p.displayName).join(", ")} · showing games for{" "}
-          <strong>{round.playerCount}</strong>
-        </div>
-      ) : (
-        <div className="round-banner round-banner-idle">
-          No round running{user.isAdmin ? " — start one in Settings." : " — ask Phil or Leo to start one."}
-        </div>
-      )}
+      <div className={`round-strip ${round ? "" : "round-strip-idle"}`}>
+        <i className="round-dot" />
+        {round ? (
+          <span>
+            <strong>{round.playerCount}</strong> playing ·{" "}
+            {round.players.map((p) => p.displayName).join(", ")}
+          </span>
+        ) : (
+          <span>{user.isAdmin ? "No round yet — start one in Settings" : "Waiting for Phil or Leo to start a round"}</span>
+        )}
+      </div>
+
+      <main className="app-main">
+        {tab === "swipe" && <Swipe refreshToken={libraryRefresh} round={round} />}
+        {tab === "matches" && (
+          <div className="scroll-area">
+            <Matches refreshToken={matchesRefresh} />
+            <div className="bgg-credit">
+              <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
+                Powered by BGG
+              </a>
+            </div>
+          </div>
+        )}
+        {tab === "settings" && user.isAdmin && (
+          <div className="scroll-area">
+            <Settings
+              round={round}
+              refreshToken={libraryRefresh}
+              syncSignal={syncSignal}
+              syncProgress={syncProgress}
+              onChanged={() => {
+                loadRound();
+                setLibraryRefresh((n) => n + 1);
+              }}
+            />
+            <div className="bgg-credit">
+              <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
+                Powered by BGG
+              </a>
+            </div>
+          </div>
+        )}
+      </main>
 
       <nav className="tab-bar">
         <button className={tab === "swipe" ? "tab-active" : ""} onClick={() => setTab("swipe")}>
+          <IconCards />
           Swipe
         </button>
         <button className={tab === "matches" ? "tab-active" : ""} onClick={() => setTab("matches")}>
+          <IconHeart />
           Matches
         </button>
         {user.isAdmin && (
           <button className={tab === "settings" ? "tab-active" : ""} onClick={() => setTab("settings")}>
+            <IconSettings />
             Settings
           </button>
         )}
       </nav>
-
-      <main className="app-main">
-        {tab === "swipe" && <Swipe refreshToken={libraryRefresh} round={round} />}
-        {tab === "matches" && <Matches refreshToken={matchesRefresh} />}
-        {tab === "settings" && user.isAdmin && (
-          <Settings
-            round={round}
-            refreshToken={libraryRefresh}
-            syncSignal={syncSignal}
-            syncProgress={syncProgress}
-            onChanged={() => {
-              loadRound();
-              setLibraryRefresh((n) => n + 1);
-            }}
-          />
-        )}
-      </main>
-
-      <footer className="app-footer">
-        <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
-          Powered by BGG
-        </a>
-      </footer>
 
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
     </div>

@@ -4,7 +4,7 @@ import { api, type CurrentUser, type Player } from "../api";
 export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: CurrentUser) => void }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api
@@ -14,56 +14,48 @@ export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: Curre
   }, []);
 
   async function pick(player: Player) {
-    setBusyId(player.id);
+    setBusy(true);
     setError(null);
     try {
       onSignedIn(await api.login(player.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in");
-      setBusyId(null);
+      setBusy(false);
     }
   }
 
   const admins = players.filter((p) => p.isAdmin);
   const guests = players.filter((p) => !p.isAdmin);
 
+  function card(p: Player) {
+    return (
+      <button key={p.id} className="profile-card" onClick={() => pick(p)} disabled={busy}>
+        <span className={`avatar ${p.isAdmin ? "" : "avatar-guest"}`}>
+          {p.displayName.charAt(0).toUpperCase()}
+        </span>
+        {p.displayName}
+      </button>
+    );
+  }
+
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <h1>🎲 Sweeple</h1>
-        <p className="login-subtitle">Who's swiping?</p>
-
-        <div className="profile-grid">
-          {admins.map((p) => (
-            <button key={p.id} className="profile-button" onClick={() => pick(p)} disabled={busyId !== null}>
-              <span className="profile-initial">{p.displayName.charAt(0).toUpperCase()}</span>
-              <span className="profile-name">{p.displayName}</span>
-            </button>
-          ))}
-        </div>
-
-        {guests.length > 0 && (
-          <>
-            <p className="profile-section-label">Tonight's guests</p>
-            <div className="profile-grid">
-              {guests.map((p) => (
-                <button
-                  key={p.id}
-                  className="profile-button profile-guest"
-                  onClick={() => pick(p)}
-                  disabled={busyId !== null}
-                >
-                  <span className="profile-initial">{p.displayName.charAt(0).toUpperCase()}</span>
-                  <span className="profile-name">{p.displayName}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {players.length === 0 && !error && <div className="empty-state">Loading profiles…</div>}
-        {error && <div className="form-error">{error}</div>}
+    <div className="profile-screen">
+      <div className="profile-hero">
+        <div className="brand-mark">🎲</div>
+        <h1>Sweeple</h1>
+        <p>Who's playing tonight?</p>
       </div>
+
+      <div className="profile-grid">{admins.map(card)}</div>
+
+      {guests.length > 0 && (
+        <>
+          <div className="profile-label">Guests</div>
+          <div className="profile-grid">{guests.map(card)}</div>
+        </>
+      )}
+
+      {error && <div className="form-error">{error}</div>}
     </div>
   );
 }

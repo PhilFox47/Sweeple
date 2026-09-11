@@ -5,11 +5,11 @@ function LinkRow({ url, label }: { url: string; label: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="link-row">
-      <a href={url} target="_blank" rel="noreferrer" className="link-row-url">
+      <a href={url} target="_blank" rel="noreferrer" >
         {label}
       </a>
       <button
-        className="secondary-button"
+        className="btn btn-ghost"
         onClick={async () => {
           await navigator.clipboard.writeText(url).catch(() => {});
           setCopied(true);
@@ -63,26 +63,26 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
   return (
     <div className="import-page">
       {links?.hasToken ? (
-        <p className="import-result">
+        <p className="form-ok">
           A BGG API token is configured, so <strong>Sync with BGG</strong> can fetch everything
           automatically. Manual import below stays available as a fallback.
         </p>
       ) : (
-        <p className="import-intro">
+        <p className="panel-hint">
           Without a BGG API token the server cannot call the API, so fetch each link in your browser
           and paste the response below. Sweeple works out which kind of response it is.
         </p>
       )}
 
-      <section className="import-step">
+      <section className="panel">
         <h3>1. Your collection</h3>
-        <p className="import-hint">
+        <p className="panel-hint">
           Open this, and if it says the request is being processed, reload after a few seconds until
           you see the game list.
         </p>
         {links && <LinkRow url={links.collectionUrl} label={`Collection for ${links.username || "?"}`} />}
         {links && (
-          <p className="import-status">
+          <p className="panel-hint">
             {links.gamesTotal > 0
               ? `${links.gamesTotal} games in your library.`
               : "No games imported yet."}
@@ -90,9 +90,9 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
         )}
       </section>
 
-      <section className="import-step">
+      <section className="panel">
         <h3>2. Game details</h3>
-        <p className="import-hint">
+        <p className="panel-hint">
           Player counts, playtime, weight, categories and mechanics — and which entries are
           expansions. BGG caps this at 20 games per request, so there may be several links.
           {" "}<strong>This endpoint requires an API token</strong>, which a browser cannot send —
@@ -100,7 +100,7 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
           with BGG instead.
         </p>
         {links && links.gamesTotal > 0 && (
-          <p className="import-status">
+          <p className="panel-hint">
             {links.gamesWithDetails} of {links.gamesTotal} games have details
             {remaining > 0 ? ` — ${remaining} link${remaining === 1 ? "" : "s"} left to paste.` : " — all done."}
           </p>
@@ -110,9 +110,9 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
         ))}
       </section>
 
-      <section className="import-step">
+      <section className="panel">
         <h3>3. Play history (optional)</h3>
-        <p className="import-hint">
+        <p className="panel-hint">
           Adds the dates behind the "not played recently" filter. Play counts already come from your
           collection. Also token-only. If you have many plays, paste each page (add{" "}
           <code>&amp;page=2</code> and so on).
@@ -120,7 +120,7 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
         {links && <LinkRow url={links.playsUrl} label="Play history" />}
       </section>
 
-      <section className="import-step">
+      <section className="panel">
         <h3>Paste the response</h3>
         <textarea
           className="import-textarea"
@@ -129,15 +129,15 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
           placeholder="Paste the XML from any of the links above…"
           spellCheck={false}
         />
-        <div className="import-actions">
-          <button className="primary-button" onClick={handleImport} disabled={busy || !xml.trim()}>
+        <div className="row-actions">
+          <button className="btn btn-primary" onClick={handleImport} disabled={busy || !xml.trim()}>
             {busy ? "Importing…" : "Import"}
           </button>
-          <button className="secondary-button" onClick={() => setXml("")} disabled={!xml}>
+          <button className="btn btn-ghost" onClick={() => setXml("")} disabled={!xml}>
             Clear
           </button>
         </div>
-        {result && <div className="import-result">{result}</div>}
+        {result && <div className="form-ok">{result}</div>}
         {error && <div className="form-error">{error}</div>}
       </section>
     </div>

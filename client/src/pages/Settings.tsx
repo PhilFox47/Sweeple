@@ -65,19 +65,19 @@ export default function Settings({
 
   return (
     <div className="settings-page">
-      <section className="import-step">
+      <section className="panel">
         <h3>Swipe round</h3>
         {round ? (
-          <p className="import-status">
+          <p className="panel-hint">
             Running with <strong>{round.playerCount}</strong>{" "}
             {round.playerCount === 1 ? "player" : "players"}: {round.players.map((p) => p.displayName).join(", ")}.
             The deck is filtered to games that play with {round.playerCount}.
           </p>
         ) : (
-          <p className="import-hint">No round running. Pick who is playing and start one.</p>
+          <p className="panel-hint">No round running. Pick who is playing and start one.</p>
         )}
 
-        <p className="settings-label">Who is playing?</p>
+        <p className="field-label">Who is playing?</p>
         <div className="chip-list">
           {players.map((p) => (
             <button
@@ -91,9 +91,9 @@ export default function Settings({
           ))}
         </div>
 
-        <div className="settings-actions">
+        <div className="row-actions">
           <button
-            className="primary-button"
+            className="btn btn-primary"
             disabled={busy || selected.length === 0}
             onClick={() =>
               run(async () => {
@@ -107,7 +107,7 @@ export default function Settings({
             Start new round
           </button>
           <button
-            className="secondary-button"
+            className="btn btn-ghost"
             disabled={busy || !round}
             onClick={() =>
               run(async () => {
@@ -119,16 +119,16 @@ export default function Settings({
             Reset current round
           </button>
         </div>
-        <p className="import-hint">
+        <p className="panel-hint">
           Starting or resetting clears everyone's swipes so you begin fresh. Games you already
           marked as played stay in the history.
         </p>
       </section>
 
-      <section className="import-step">
+      <section className="panel">
         <h3>Temporary players</h3>
-        <p className="import-hint">Add someone joining for tonight. They can swipe but not change settings.</p>
-        <div className="settings-actions">
+        <p className="panel-hint">Add someone joining for tonight. They can swipe but not change settings.</p>
+        <div className="inline-form">
           <input
             type="text"
             placeholder="Name"
@@ -145,7 +145,7 @@ export default function Settings({
             }}
           />
           <button
-            className="primary-button"
+            className="btn btn-primary"
             disabled={busy || !guestName.trim()}
             onClick={() =>
               run(async () => {
@@ -158,15 +158,15 @@ export default function Settings({
             Add
           </button>
         </div>
-        <div className="player-list">
+        <div className="list-rows">
           {players.map((p) => (
-            <div className="player-row" key={p.id}>
+            <div className="list-row" key={p.id}>
               <span>
                 {p.displayName} {p.isAdmin && <span className="chip-tag">permanent</span>}
               </span>
               {!p.isAdmin && (
                 <button
-                  className="link-button"
+                  className="btn btn-danger"
                   disabled={busy}
                   onClick={() => run(async () => {
                     await api.removePlayer(p.id);
@@ -181,12 +181,12 @@ export default function Settings({
         </div>
       </section>
 
-      <section className="import-step">
+      <section className="panel">
         <h3>BoardGameGeek</h3>
         <SyncControl syncSignal={syncSignal} progress={syncProgress} />
       </section>
 
-      {notice && <div className="import-result">{notice}</div>}
+      {notice && <div className="form-ok">{notice}</div>}
       {error && <div className="form-error">{error}</div>}
 
       <Import refreshToken={refreshToken} onImported={onChanged} />
