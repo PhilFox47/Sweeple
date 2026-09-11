@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
-import { authenticate } from "../auth.js";
+import { authenticate, requireAdmin } from "../auth.js";
 import { isSyncInProgress, runSync, stopSync } from "../sync.js";
 
 export default async function syncRoutes(app: FastifyInstance) {
-  app.post("/api/sync", { preHandler: authenticate }, async (request, reply) => {
+  app.post("/api/sync", { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
     if (isSyncInProgress()) {
       return reply.code(409).send({ error: "Sync already in progress" });
     }
@@ -12,7 +12,7 @@ export default async function syncRoutes(app: FastifyInstance) {
     return { ok: true, started: true };
   });
 
-  app.post("/api/sync/stop", { preHandler: authenticate }, async () => {
+  app.post("/api/sync/stop", { preHandler: [authenticate, requireAdmin] }, async () => {
     return { ok: true, stopped: stopSync() };
   });
 

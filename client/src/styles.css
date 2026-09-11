@@ -241,6 +241,7 @@ select {
 .game-card-image {
   flex: 1;
   min-height: 0;
+  position: relative;
   background-color: var(--border);
   display: flex;
   align-items: center;
@@ -258,28 +259,87 @@ select {
 }
 
 .game-card-image-fallback {
-  padding: 1rem;
-  text-align: center;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-size: 3rem;
+  opacity: 0.35;
 }
 
 .game-card-info {
   padding: 1rem;
 }
 
-.game-card-info h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.1rem;
+.game-card-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2.5rem 0.9rem 0.7rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0));
 }
+
+.game-card-title h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.game-card-best {
+  font-size: 0.9rem;
+  margin-bottom: 0.15rem;
+}
+
+.game-card-best.best-match {
+  color: var(--like);
+}
+
+.best-badge {
+  display: inline-block;
+  background: var(--like);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+.game-card-range,
+.game-card-stats {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.game-card-dot {
+  margin: 0 0.35rem;
+}
+
+.game-card-muted {
+  color: var(--text-muted);
+}
+
+.weight-1 { color: #3fae6a; }
+.weight-2 { color: #7bb342; }
+.weight-3 { color: #d8a534; }
+.weight-4 { color: #e07b39; }
+.weight-5 { color: #d6453d; }
 
 .game-card-tags {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
   flex-wrap: wrap;
-  font-size: 0.8rem;
+  margin: 0.35rem 0 0.3rem;
+}
+
+.game-tag {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
-  margin-bottom: 0.4rem;
+  white-space: nowrap;
 }
 
 .game-card-categories {
@@ -574,4 +634,117 @@ select {
 
 .app-footer a:hover {
   color: var(--accent);
+}
+
+/* Profile picker */
+.profile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.profile-button {
+  flex: 1 1 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.1rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+}
+
+.profile-button:disabled {
+  opacity: 0.6;
+}
+
+.profile-initial {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-guest .profile-initial {
+  background: var(--text-muted);
+}
+
+.profile-name {
+  font-weight: 600;
+}
+
+.profile-section-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 1rem 0 0.4rem;
+}
+
+/* Round banner */
+.round-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.round-banner-idle {
+  border-style: dashed;
+}
+
+/* Settings */
+.settings-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0.9rem 0 0.4rem;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.settings-actions input {
+  flex: 1 1 140px;
+}
+
+.chip-tag {
+  margin-left: 0.35rem;
+  font-size: 0.65rem;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.player-list {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.player-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.88rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.player-row:last-child {
+  border-bottom: none;
 }

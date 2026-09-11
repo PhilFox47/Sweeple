@@ -12,6 +12,8 @@ export type ServerEvent =
   | { type: "sync-started" }
   | { type: "sync-progress"; message: string }
   | { type: "library-changed" }
+  | { type: "round-changed" }
+  | { type: "players-changed" }
   | { type: "sync-finished"; gamesAdded: number; gamesUpdated: number; status: "success" | "error"; error?: string };
 
 export function broadcast(event: ServerEvent) {

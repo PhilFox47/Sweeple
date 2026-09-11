@@ -309,6 +309,42 @@ export interface GameDetails {
   categories: string[];
   mechanics: string[];
   isExpansion: boolean;
+  bestPlayers: number[];
+  recommendedPlayers: number[];
+}
+
+/**
+ * BGG's "suggested_numplayers" poll, where voters rate each player count Best / Recommended /
+ * Not Recommended. A count is "best" when Best wins the vote outright, otherwise "recommended"
+ * if Recommended beats Not Recommended.
+ *
+ * The poll also carries an entry like numplayers="6+" meaning "more than the maximum"; parsing
+ * that as 6 would collide with a real 6-player entry, so those are skipped.
+ */
+function parseSuggestedPlayers(item: any): { best: number[]; recommended: number[] } {
+  const poll = toArray(item.poll).find((p: any) => p["@_name"] === "suggested_numplayers");
+  const best: number[] = [];
+  const recommended: number[] = [];
+  if (!poll) return { best, recommended };
+
+  for (const results of toArray((poll as any).results)) {
+    const label = String((results as any)["@_numplayers"] ?? "");
+    if (label.includes("+")) continue;
+    const count = Number.parseInt(label, 10);
+    if (!Number.isFinite(count)) continue;
+
+    const votes: Record<string, number> = {};
+    for (const r of toArray((results as any).result)) {
+      votes[String((r as any)["@_value"])] = Number((r as any)["@_numvotes"] ?? 0);
+    }
+    const b = votes.Best ?? 0;
+    const rec = votes.Recommended ?? 0;
+    const no = votes["Not Recommended"] ?? 0;
+
+    if (b > 0 && b >= rec && b >= no) best.push(count);
+    else if (rec > 0 && rec >= no) recommended.push(count);
+  }
+  return { best, recommended };
 }
 
 export function parseThingXml(xml: string): GameDetails[] {
@@ -324,6 +360,7 @@ export function parseThingXml(xml: string): GameDetails[] {
     const mechanics = links.filter((l: any) => l["@_type"] === "boardgamemechanic").map((l: any) => l["@_value"]);
     const stats = item.statistics?.ratings;
     const rank = toArray(stats?.ranks?.rank).find((r: any) => r["@_name"] === "boardgame");
+    const suggested = parseSuggestedPlayers(item);
 
     return {
       bggId: Number(item["@_id"]),
@@ -343,6 +380,8 @@ export function parseThingXml(xml: string): GameDetails[] {
       mechanics,
       // Only the thing endpoint distinguishes these; a collection lists expansions as "boardgame".
       isExpansion: item["@_type"] === "boardgameexpansion",
+      bestPlayers: suggested.best,
+      recommendedPlayers: suggested.recommended,
     };
   });
 }

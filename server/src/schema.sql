@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS matches (
   played_at TEXT
 );
 
+-- A swipe round is one sitting: a fixed set of players deciding on a game together.
+-- The active round is the one with ended_at IS NULL.
+CREATE TABLE IF NOT EXISTS rounds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at TEXT NOT NULL DEFAULT (datetime('now')),
+  ended_at TEXT,
+  player_ids TEXT NOT NULL DEFAULT '[]'
+);
+
 CREATE TABLE IF NOT EXISTS sync_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   started_at TEXT NOT NULL DEFAULT (datetime('now')),

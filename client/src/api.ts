@@ -15,6 +15,8 @@ export interface Game {
   bggRank: number | null;
   categories: string[];
   mechanics: string[];
+  bestPlayers: number[];
+  recommendedPlayers: number[];
   numPlays: number;
   lastPlayedAt: string | null;
   isExpansion: boolean;
@@ -49,6 +51,21 @@ export interface CurrentUser {
   username: string;
   displayName: string;
   role: "core" | "guest";
+  isAdmin: boolean;
+}
+
+export interface Player {
+  id: number;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
+}
+
+export interface Round {
+  id: number;
+  startedAt: string;
+  players: { id: number; displayName: string; isAdmin: boolean }[];
+  playerCount: number;
 }
 
 export interface Filters {
@@ -90,9 +107,17 @@ function filtersToQuery(filters: Filters): string {
 }
 
 export const api = {
-  listUsers: () => request<{ users: { id: number; username: string; displayName: string }[] }>("/api/users"),
-  login: (username: string, password: string) =>
-    request<CurrentUser>("/api/login", { method: "POST", body: JSON.stringify({ username, password }) }),
+  listUsers: () => request<{ users: Player[] }>("/api/users"),
+  login: (userId: number) =>
+    request<CurrentUser>("/api/login", { method: "POST", body: JSON.stringify({ userId }) }),
+  addGuest: (displayName: string) =>
+    request<Player>("/api/users/guest", { method: "POST", body: JSON.stringify({ displayName }) }),
+  removePlayer: (id: number) => request<{ ok: true }>(`/api/users/${id}`, { method: "DELETE" }),
+
+  round: () => request<{ round: Round | null }>("/api/round"),
+  startRound: (playerIds: number[]) =>
+    request<{ round: Round }>("/api/round/start", { method: "POST", body: JSON.stringify({ playerIds }) }),
+  resetRound: () => request<{ ok: true; swipes: number; matches: number }>("/api/round/reset", { method: "POST" }),
   logout: () => request<{ ok: true }>("/api/logout", { method: "POST" }),
   me: () => request<CurrentUser>("/api/me"),
 

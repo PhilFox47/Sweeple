@@ -8,18 +8,18 @@ you (no push notifications, just live in-app updates), ready to play.
 
 ## How it works
 
-- **BGG sync**: pulls your owned games, stats (weight, player count, playtime), categories,
-  mechanics, and play history from the BGG account `PhilFox` via the public XML API. Runs
-  automatically once a week (Sunday 4am) and on-demand via the "Sync with BGG" button. Everything
-  is cached in a local SQLite database — no BGG calls happen while you're swiping.
-- **Filters**: player count, weight range, max playtime, categories, mechanics, "not played
-  recently."
-- **Matching**: a match is created the moment both of your accounts have swiped right on the same
-  game. Marking a match "played" clears both your decisions for that game so it can naturally
-  reappear in a future session.
-- **Accounts**: two accounts are seeded from environment variables at first boot. An existing
-  account can add further (e.g. guest) accounts via `POST /api/users/guest` — the schema and login
-  flow already support more than two users.
+- **Profiles**: open the app and pick who you are — no passwords, it runs on your own network.
+  Phil and Leo are permanent profiles and the only ones who can reach Settings.
+- **Rounds**: a round is one sitting. An admin picks who is playing and starts it, which clears
+  everyone's swipes. The deck is then filtered to games that play with that many people, and a
+  game only becomes a match once *everybody in the round* has swiped right.
+- **Temporary players**: add someone joining for the evening in Settings. They can swipe but not
+  change anything, and can be removed again afterwards.
+- **Deck order**: shuffled every time. Games BGG's players rate as "best with" your exact group
+  size get a modest head start, so they surface early without hiding everything else.
+- **Filters**: player count, weight, playtime, categories, mechanics, "not played recently".
+- **Matches**: marking a match played clears everyone's decisions for that game so it can come
+  round again later; the play itself stays in the history.
 
 ## Getting your games in
 

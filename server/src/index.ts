@@ -11,6 +11,7 @@ import authRoutes from "./routes/auth.js";
 import gamesRoutes from "./routes/games.js";
 import importRoutes from "./routes/import.js";
 import matchesRoutes from "./routes/matches.js";
+import roundRoutes from "./routes/rounds.js";
 import swipesRoutes from "./routes/swipes.js";
 import syncRoutes from "./routes/sync.js";
 import { runSync } from "./sync.js";
@@ -35,6 +36,7 @@ await app.register(gamesRoutes);
 await app.register(importRoutes);
 await app.register(swipesRoutes);
 await app.register(matchesRoutes);
+await app.register(roundRoutes);
 await app.register(syncRoutes);
 
 await app.register(fastifyStatic, {

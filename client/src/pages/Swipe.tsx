@@ -1,21 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import TinderCard from "react-tinder-card";
-import { api, type Filters, type Game } from "../api";
+import { api, type Filters, type Game, type Round } from "../api";
 import FilterBar from "../components/FilterBar";
 import GameCard from "../components/GameCard";
 
 type SwipeDirection = "left" | "right" | "up" | "down";
 
-function shuffle<T>(items: T[]): T[] {
-  const result = [...items];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
+/**
+ * Games BGG rates as "best with" the current group get a head start, without excluding the rest:
+ * each game draws a random key and matching games subtract a bonus, so they cluster early but
+ * everything still mixes in.
+ */
+// 0.15 puts a best-with game first roughly 76% of the time against 50% by chance — a clear
+// lean without burying everything else. Raising it much past 0.2 crowds the other games out.
+const BEST_WITH_BONUS = 0.15;
+
+function orderDeck(games: Game[], playerCount?: number): Game[] {
+  const shown = games
+    .map((game) => {
+      const bonus = playerCount !== undefined && game.bestPlayers.includes(playerCount) ? BEST_WITH_BONUS : 0;
+      return { game, key: Math.random() - bonus };
+    })
+    .sort((a, b) => a.key - b.key)
+    .map((entry) => entry.game);
+
+  // The stack renders the last element on top, so reverse to show `shown[0]` first.
+  return shown.reverse();
 }
 
-export default function Swipe({ refreshToken }: { refreshToken: number }) {
+export default function Swipe({ refreshToken, round }: { refreshToken: number; round: Round | null }) {
   const [deck, setDeck] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,12 +37,12 @@ export default function Swipe({ refreshToken }: { refreshToken: number }) {
   const cardRefs = useRef<Record<number, any>>({});
 
   const loadDeck = useMemo(
-    () => async (currentFilters: Filters) => {
+    () => async (currentFilters: Filters, playerCount?: number) => {
       setLoading(true);
       setError(null);
       try {
         const { games } = await api.deck(currentFilters);
-        setDeck(shuffle(games));
+        setDeck(orderDeck(games, playerCount));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load games");
       } finally {
@@ -39,9 +52,14 @@ export default function Swipe({ refreshToken }: { refreshToken: number }) {
     []
   );
 
+  // A running round sets the player-count filter, which stays adjustable in the filter panel.
   useEffect(() => {
-    loadDeck(filters);
-  }, [filters, loadDeck, refreshToken]);
+    if (round) setFilters((prev) => ({ ...prev, playerCount: round.playerCount }));
+  }, [round?.id, round?.playerCount]);
+
+  useEffect(() => {
+    loadDeck(filters, round?.playerCount);
+  }, [filters, loadDeck, refreshToken, round?.playerCount]);
 
   async function handleDecision(game: Game, direction: SwipeDirection) {
     if (direction !== "left" && direction !== "right") return;
@@ -65,7 +83,7 @@ export default function Swipe({ refreshToken }: { refreshToken: number }) {
       return;
     }
     await api.resetSwipes();
-    loadDeck(filters);
+    loadDeck(filters, round?.playerCount);
   }
 
   return (
@@ -100,7 +118,7 @@ export default function Swipe({ refreshToken }: { refreshToken: number }) {
               preventSwipe={["up", "down"]}
               className="tinder-card"
             >
-              <GameCard game={game} />
+              <GameCard game={game} playerCount={round?.playerCount} />
             </TinderCard>
           ))}
       </div>

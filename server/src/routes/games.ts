@@ -19,6 +19,8 @@ interface GameRow {
   bgg_rank: number | null;
   categories: string;
   mechanics: string;
+  best_players: string;
+  recommended_players: string;
   num_plays: number;
   last_played_at: string | null;
   is_expansion: number;
@@ -43,6 +45,8 @@ function serializeGame(row: GameRow) {
     bggRank: row.bgg_rank,
     categories: JSON.parse(row.categories) as string[],
     mechanics: JSON.parse(row.mechanics) as string[],
+    bestPlayers: JSON.parse(row.best_players ?? "[]") as number[],
+    recommendedPlayers: JSON.parse(row.recommended_players ?? "[]") as number[],
     numPlays: row.num_plays,
     lastPlayedAt: row.last_played_at,
     isExpansion: !!row.is_expansion,

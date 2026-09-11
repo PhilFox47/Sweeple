@@ -63,6 +63,13 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   request.user = user;
 }
 
+/** Only the permanent profiles manage rounds, players and syncing. */
+export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  if (request.user?.role !== "core") {
+    reply.code(403).send({ error: "Only Phil and Leo can change this." });
+  }
+}
+
 export function getSessionToken(request: FastifyRequest): string | undefined {
   return request.cookies[SESSION_COOKIE];
 }

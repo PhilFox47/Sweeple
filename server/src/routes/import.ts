@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { authenticate } from "../auth.js";
+import { authenticate, requireAdmin } from "../auth.js";
 import { collectionUrl, configuredToken, parseCollectionXml, parsePlaysXml, parseThingXml, thingUrl } from "../bgg.js";
 import { applyCollection, applyDetails, applyPlays, gamesMissingDetails } from "../store.js";
 import { db } from "../db.js";
@@ -15,7 +15,7 @@ function detectKind(xml: string): "collection" | "thing" | "plays" | null {
 }
 
 export default async function importRoutes(app: FastifyInstance) {
-  app.get("/api/import/links", { preHandler: authenticate }, async () => {
+  app.get("/api/import/links", { preHandler: [authenticate, requireAdmin] }, async () => {
     const username = process.env.BGG_USERNAME ?? "";
     const missing = gamesMissingDetails();
     const detailBatches: { url: string; count: number }[] = [];
@@ -41,7 +41,7 @@ export default async function importRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post<{ Body: { xml: string } }>("/api/import", { preHandler: authenticate }, async (request, reply) => {
+  app.post<{ Body: { xml: string } }>("/api/import", { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
     const xml = request.body?.xml?.trim();
     if (!xml) return reply.code(400).send({ error: "Paste the BGG response first." });
 

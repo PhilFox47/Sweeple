@@ -1,17 +1,19 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { authenticate } from "../auth.js";
+import { matchParticipantIds } from "../rounds.js";
 import { broadcast } from "../ws.js";
 
 function reconcileMatch(gameId: number) {
-  const coreUsers = db.prepare("SELECT id FROM users WHERE role = 'core'").all() as { id: number }[];
-  if (coreUsers.length < 2) return;
+  // Everyone playing this round has to agree, not just the two permanent profiles.
+  const participants = matchParticipantIds();
+  if (participants.length === 0) return;
 
   const likes = db
     .prepare("SELECT user_id FROM swipes WHERE game_id = ? AND decision = 'like'")
     .all(gameId) as { user_id: number }[];
   const likedUserIds = new Set(likes.map((l) => l.user_id));
-  const allCoreLiked = coreUsers.every((u) => likedUserIds.has(u.id));
+  const allCoreLiked = participants.every((id) => likedUserIds.has(id));
 
   const existingMatch = db.prepare("SELECT id, played_at FROM matches WHERE game_id = ?").get(gameId) as
     | { id: number; played_at: string | null }

@@ -77,6 +77,8 @@ const updateDetails = db.prepare(`
     categories = @categories,
     mechanics = @mechanics,
     is_expansion = @isExpansion,
+    best_players = @bestPlayers,
+    recommended_players = @recommendedPlayers,
     last_synced_at = datetime('now'),
     updated_at = datetime('now')
   WHERE bgg_id = @bggId
@@ -100,6 +102,8 @@ export function applyDetails(details: GameDetails[]): { updated: number; unknown
         categories: JSON.stringify(d.categories),
         mechanics: JSON.stringify(d.mechanics),
         isExpansion: d.isExpansion ? 1 : 0,
+        bestPlayers: JSON.stringify(d.bestPlayers),
+        recommendedPlayers: JSON.stringify(d.recommendedPlayers),
       }).changes;
       if (changes > 0) updated += 1;
       else unknown += 1;
