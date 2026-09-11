@@ -25,7 +25,7 @@ export interface Game {
 
 export type ExpansionMode = "auto" | "hidden" | "standalone";
 
-export interface Expansion {
+export interface LibraryGame {
   id: number;
   name: string;
   thumbnail: string | null;
@@ -33,6 +33,8 @@ export interface Expansion {
   maxPlayers: number | null;
   isExpansion: boolean;
   mode: ExpansionMode;
+  /** Set when other owned boxes clearly belong to the same series, e.g. "Disney Villainous". */
+  series: string | null;
   /** Whether the deck currently leaves it out, once the override is applied. */
   hidden: boolean;
 }
@@ -154,9 +156,9 @@ export const api = {
   importXml: (xml: string) =>
     request<{ kind: string; message: string }>("/api/import", { method: "POST", body: JSON.stringify({ xml }) }),
 
-  expansions: () => request<{ expansions: Expansion[] }>("/api/expansions"),
-  setExpansionMode: (id: number, mode: ExpansionMode) =>
-    request<{ ok: true; id: number; mode: ExpansionMode }>(`/api/expansions/${id}`, {
+  library: () => request<{ games: LibraryGame[] }>("/api/library"),
+  setGameVisibility: (id: number, mode: ExpansionMode) =>
+    request<{ ok: true; id: number; mode: ExpansionMode }>(`/api/library/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ mode }),
     }),

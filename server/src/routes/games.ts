@@ -55,13 +55,11 @@ function serializeGame(row: GameRow) {
   };
 }
 
-/** Resolves the manual override against BGG's flag. */
-export const EFFECTIVE_EXPANSION = `
-  (CASE expansion_mode
-     WHEN 'hidden' THEN 1
-     WHEN 'standalone' THEN 0
-     ELSE is_expansion
-   END)`;
+/** Hidden by hand: out of the deck whatever the filters say. */
+export const NOT_HIDDEN = "expansion_mode <> 'hidden'";
+
+/** Counts as an expansion — BGG's flag, unless it has been marked standalone by hand. */
+export const IS_EXPANSION = "(is_expansion = 1 AND expansion_mode <> 'standalone')";
 
 interface GameFilters {
   playerCount?: number;
@@ -93,9 +91,10 @@ function buildWhere(filters: GameFilters): { clause: string; params: Record<stri
   const clauses: string[] = ["owned = 1"];
   const params: Record<string, unknown> = {};
 
-  // A game counts as an expansion unless it has been marked standalone by hand, and counts as
-  // one regardless of BGG when it has been hidden by hand.
-  if (!filters.includeExpansions) clauses.push(`${EFFECTIVE_EXPANSION} = 0`);
+  // Hiding a game is a decision about the game itself, so it outranks every filter — including
+  // "include expansions", which is only about what BGG thinks a game is.
+  clauses.push(NOT_HIDDEN);
+  if (!filters.includeExpansions) clauses.push(`NOT ${IS_EXPANSION}`);
   if (filters.playerCount !== undefined) {
     clauses.push("(min_players IS NULL OR min_players <= @playerCount)");
     clauses.push("(max_players IS NULL OR max_players >= @playerCount)");
