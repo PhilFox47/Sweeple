@@ -44,7 +44,10 @@ function lastPlayedLabel(game: Game): string {
   if (days <= 0) return "Played today";
   if (days === 1) return "Played yesterday";
   if (days < 30) return `Last played ${days} days ago`;
-  if (days < 365) return `Last played ${Math.round(days / 30)} months ago`;
+  if (days < 365) {
+    const months = Math.round(days / 30);
+    return `Last played ${months} ${months === 1 ? "month" : "months"} ago`;
+  }
   return `Last played ${new Date(game.lastPlayedAt).toLocaleDateString()}`;
 }
 

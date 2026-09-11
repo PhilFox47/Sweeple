@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type CurrentUser, type Round } from "./api";
+import { api, type CurrentUser, type Match, type Round } from "./api";
 import Toasts, { type Toast } from "./components/Toasts";
 import { IconCards, IconHeart, IconSettings } from "./components/icons";
 import { useServerEvents, type ServerEvent } from "./hooks/useServerEvents";
@@ -17,7 +17,7 @@ export default function App() {
   const [round, setRound] = useState<Round | null>(null);
   const [tab, setTab] = useState<Tab>("swipe");
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [matchesRefresh, setMatchesRefresh] = useState(0);
+  const [matches, setMatches] = useState<Match[]>([]);
   const [libraryRefresh, setLibraryRefresh] = useState(0);
   const [syncSignal, setSyncSignal] = useState(0);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
@@ -30,15 +30,25 @@ export default function App() {
     }
   }, []);
 
+  // Held here rather than in the Matches page so the tab badge and the list agree.
+  const loadMatches = useCallback(async () => {
+    try {
+      setMatches((await api.matches()).matches);
+    } catch {
+      // Not signed in yet.
+    }
+  }, []);
+
   useEffect(() => {
     api
       .me()
       .then((me) => {
         setUser(me);
         loadRound();
+        loadMatches();
       })
       .catch(() => setUser(null));
-  }, [loadRound]);
+  }, [loadRound, loadMatches]);
 
   const pushToast = useCallback((kind: Toast["kind"], message: string) => {
     const id = ++toastId;
@@ -50,11 +60,11 @@ export default function App() {
     (event: ServerEvent) => {
       if (event.type === "match") {
         pushToast("match", `It's a match — "${event.gameName}" 🎉`);
-        setMatchesRefresh((n) => n + 1);
+        loadMatches();
       } else if (event.type === "round-changed") {
         loadRound();
         setLibraryRefresh((n) => n + 1);
-        setMatchesRefresh((n) => n + 1);
+        loadMatches();
       } else if (event.type === "players-changed") {
         setLibraryRefresh((n) => n + 1);
       } else if (event.type === "sync-started") {
@@ -77,10 +87,14 @@ export default function App() {
         }
       }
     },
-    [pushToast, loadRound]
+    [pushToast, loadRound, loadMatches]
   );
 
   useServerEvents(handleServerEvent);
+
+  // Matches waiting to be played — the round's decisions are cleared when a new one starts,
+  // so this is also "how many we've found tonight".
+  const pendingMatches = matches.filter((m) => !m.playedAt).length;
 
   async function handleSignOut() {
     await api.logout();
@@ -104,6 +118,7 @@ export default function App() {
         onSignedIn={(u) => {
           setUser(u);
           loadRound();
+          loadMatches();
         }}
       />
     );
@@ -139,7 +154,7 @@ export default function App() {
         {tab === "swipe" && <Swipe refreshToken={libraryRefresh} round={round} />}
         {tab === "matches" && (
           <div className="scroll-area">
-            <Matches refreshToken={matchesRefresh} />
+            <Matches matches={matches} onChanged={loadMatches} />
             <div className="bgg-credit">
               <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
                 Powered by BGG
@@ -174,7 +189,14 @@ export default function App() {
           Swipe
         </button>
         <button className={tab === "matches" ? "tab-active" : ""} onClick={() => setTab("matches")}>
-          <IconHeart />
+          <span className="tab-icon">
+            <IconHeart />
+            {pendingMatches > 0 && (
+              <span className="tab-badge" key={pendingMatches}>
+                {pendingMatches}
+              </span>
+            )}
+          </span>
           Matches
         </button>
         {user.isAdmin && (
