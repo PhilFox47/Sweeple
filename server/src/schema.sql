@@ -48,6 +48,23 @@ CREATE TABLE IF NOT EXISTS swipes (
   UNIQUE(user_id, game_id)
 );
 
+-- Every decision ever made, kept across rounds. `swipes` is the current sitting and gets wiped;
+-- this is the history the pick ratings are built from. One row per player per game per round, so
+-- changing your mind mid-round corrects the vote instead of counting twice, while the same game
+-- coming round again on another evening counts again.
+CREATE TABLE IF NOT EXISTS votes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  round_id INTEGER NOT NULL DEFAULT 0,
+  decision TEXT NOT NULL CHECK (decision IN ('like', 'dislike')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(user_id, game_id, round_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_votes_game ON votes(game_id);
+CREATE INDEX IF NOT EXISTS idx_votes_user_game ON votes(user_id, game_id);
+
 CREATE TABLE IF NOT EXISTS matches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   game_id INTEGER NOT NULL UNIQUE REFERENCES games(id) ON DELETE CASCADE,

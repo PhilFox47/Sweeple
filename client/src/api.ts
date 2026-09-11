@@ -1,3 +1,18 @@
+export interface PlayerRating {
+  id: number;
+  displayName: string;
+  likes: number;
+  total: number;
+}
+
+export interface GameRating {
+  likes: number;
+  total: number;
+  /** 0–1, or null when nobody has voted on this game yet. */
+  ratio: number | null;
+  byPlayer: PlayerRating[];
+}
+
 export interface Game {
   id: number;
   bggId: number;
@@ -21,6 +36,8 @@ export interface Game {
   lastPlayedAt: string | null;
   isExpansion: boolean;
   expansionMode: ExpansionMode;
+  /** How the player looking at the card has voted on it before. */
+  yourVotes: { likes: number; total: number };
 }
 
 export type ExpansionMode = "auto" | "hidden" | "standalone";
@@ -37,6 +54,7 @@ export interface LibraryGame {
   series: string | null;
   /** Whether the deck currently leaves it out, once the override is applied. */
   hidden: boolean;
+  rating: GameRating;
 }
 
 export interface Match {
@@ -130,9 +148,9 @@ export const api = {
   listUsers: () => request<{ users: Player[] }>("/api/users"),
   login: (userId: number) =>
     request<CurrentUser>("/api/login", { method: "POST", body: JSON.stringify({ userId }) }),
-  addGuest: (displayName: string) =>
-    request<Player>("/api/users/guest", { method: "POST", body: JSON.stringify({ displayName }) }),
-  removePlayer: (id: number) => request<{ ok: true }>(`/api/users/${id}`, { method: "DELETE" }),
+  addProfile: (displayName: string) =>
+    request<Player>("/api/users", { method: "POST", body: JSON.stringify({ displayName }) }),
+  removeProfile: (id: number) => request<{ ok: true }>(`/api/users/${id}`, { method: "DELETE" }),
 
   round: () => request<{ round: Round | null }>("/api/round"),
   startRound: (playerIds: number[]) =>

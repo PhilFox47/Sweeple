@@ -35,6 +35,14 @@ function hydrate(row: RoundRow): Round {
   return { id: row.id, startedAt: row.started_at, players, playerCount: players.length };
 }
 
+/** The round a vote belongs to; 0 when swiping outside a round. */
+export function activeRoundId(): number {
+  const row = db.prepare("SELECT id FROM rounds WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1").get() as
+    | { id: number }
+    | undefined;
+  return row?.id ?? 0;
+}
+
 export function getActiveRound(): Round | null {
   const row = db
     .prepare("SELECT id, started_at, player_ids FROM rounds WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1")

@@ -19,7 +19,7 @@ export default function Settings({
 }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
-  const [guestName, setGuestName] = useState("");
+  const [newProfile, setNewProfile] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -87,7 +87,7 @@ export default function Settings({
               onClick={() => toggle(p.id)}
             >
               {p.displayName}
-              {!p.isAdmin && <span className="chip-tag">guest</span>}
+              {!p.isAdmin && <span className="chip-tag">extra</span>}
             </button>
           ))}
         </div>
@@ -127,19 +127,22 @@ export default function Settings({
       </section>
 
       <section className="panel">
-        <h3>Temporary players</h3>
-        <p className="panel-hint">Add someone joining for tonight. They can swipe but not change settings.</p>
+        <h3>Profiles</h3>
+        <p className="panel-hint">
+          Anyone who swipes needs a profile — it is how their picks are counted. Profiles stay,
+          so someone who plays again keeps their pick ratings. They can swipe but not change settings.
+        </p>
         <div className="inline-form">
           <input
             type="text"
-            placeholder="Name"
-            value={guestName}
-            onChange={(e) => setGuestName(e.target.value)}
+            placeholder="Profile name"
+            value={newProfile}
+            onChange={(e) => setNewProfile(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && guestName.trim()) {
+              if (e.key === "Enter" && newProfile.trim()) {
                 run(async () => {
-                  const p = await api.addGuest(guestName.trim());
-                  setGuestName("");
+                  const p = await api.addProfile(newProfile.trim());
+                  setNewProfile("");
                   return `Added ${p.displayName}.`;
                 });
               }
@@ -147,11 +150,11 @@ export default function Settings({
           />
           <button
             className="btn btn-primary"
-            disabled={busy || !guestName.trim()}
+            disabled={busy || !newProfile.trim()}
             onClick={() =>
               run(async () => {
-                const p = await api.addGuest(guestName.trim());
-                setGuestName("");
+                const p = await api.addProfile(newProfile.trim());
+                setNewProfile("");
                 return `Added ${p.displayName}.`;
               })
             }
@@ -163,14 +166,14 @@ export default function Settings({
           {players.map((p) => (
             <div className="list-row" key={p.id}>
               <span>
-                {p.displayName} {p.isAdmin && <span className="chip-tag">permanent</span>}
+                {p.displayName} {p.isAdmin && <span className="chip-tag">admin</span>}
               </span>
               {!p.isAdmin && (
                 <button
                   className="btn btn-danger"
                   disabled={busy}
                   onClick={() => run(async () => {
-                    await api.removePlayer(p.id);
+                    await api.removeProfile(p.id);
                     return `Removed ${p.displayName}.`;
                   })}
                 >

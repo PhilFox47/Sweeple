@@ -33,6 +33,24 @@ addColumnIfMissing("games", "recommended_players", "TEXT NOT NULL DEFAULT '[]'")
 // Deliberately never written by syncing or importing, so choices survive a library refresh.
 addColumnIfMissing("games", "expansion_mode", "TEXT NOT NULL DEFAULT 'auto'");
 
+/**
+ * Votes were introduced after the app had been in use, and the swipes sitting in the database at
+ * that point are real decisions. Carry them over once so the first ratings are not empty.
+ */
+const voteCount = (db.prepare("SELECT COUNT(*) AS n FROM votes").get() as { n: number }).n;
+if (voteCount === 0) {
+  const round = db.prepare("SELECT id FROM rounds WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1").get() as
+    | { id: number }
+    | undefined;
+  const copied = db
+    .prepare(
+      `INSERT OR IGNORE INTO votes (user_id, game_id, round_id, decision, created_at)
+       SELECT user_id, game_id, ?, decision, created_at FROM swipes`
+    )
+    .run(round?.id ?? 0).changes;
+  if (copied > 0) console.log(`[db] migrated: seeded ${copied} pick ratings from the current round`);
+}
+
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
   const hash = scryptSync(password, salt, 64).toString("hex");

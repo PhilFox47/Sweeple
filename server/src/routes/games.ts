@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { authenticate } from "../auth.js";
+import { ratingsForUser } from "../stats.js";
 
 interface GameRow {
   id: number;
@@ -154,7 +155,13 @@ export default async function gamesRoutes(app: FastifyInstance) {
          ORDER BY name`
       )
       .all({ ...params, userId: request.user!.id }) as GameRow[];
-    return { games: rows.map(serializeGame) };
+
+    // Your own history with each game, so the card can say "you liked this 2 of 3 times".
+    // Deliberately only your own: what the others think is the point of the round.
+    const mine = ratingsForUser(request.user!.id);
+    return {
+      games: rows.map((row) => ({ ...serializeGame(row), yourVotes: mine.get(row.id) ?? { likes: 0, total: 0 } })),
+    };
   });
 
   app.get("/api/meta/categories", { preHandler: authenticate }, async () => {

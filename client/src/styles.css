@@ -977,6 +977,47 @@ textarea:focus {
   color: var(--text-faint);
 }
 
+.card-history {
+  color: var(--text-dim);
+}
+
+.library-rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.45rem;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.library-rating.is-empty {
+  font-style: italic;
+}
+
+.rate {
+  font-weight: 700;
+}
+
+.rate-low {
+  color: var(--nope);
+}
+
+.rate-mid {
+  color: var(--text-dim);
+}
+
+.rate-high {
+  color: var(--like);
+}
+
+.rate-player {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
 .library-group {
   margin-top: 1rem;
 }

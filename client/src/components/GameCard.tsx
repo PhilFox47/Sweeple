@@ -51,6 +51,16 @@ function lastPlayedLabel(game: Game): string {
   return `Last played ${new Date(game.lastPlayedAt).toLocaleDateString()}`;
 }
 
+/** Your own past decisions on this game. Only yours: what the others think is tonight's question. */
+function yourHistory(game: Game): string | null {
+  const { likes, total } = game.yourVotes;
+  if (total === 0) return null;
+  if (total === 1) return likes === 1 ? "You liked this last time" : "You passed on this last time";
+  if (likes === 0) return `You passed on this all ${total} times`;
+  if (likes === total) return `You picked this all ${total} times`;
+  return `You picked this ${likes} of ${total} times`;
+}
+
 export default function GameCard({
   game,
   playerCount,
@@ -138,7 +148,10 @@ export default function GameCard({
           </div>
         )}
 
-        <div className="card-played">{lastPlayedLabel(game)}</div>
+        <div className="card-played">
+          {lastPlayedLabel(game)}
+          {yourHistory(game) && <span className="card-history"> · {yourHistory(game)}</span>}
+        </div>
       </div>
     </div>
   );

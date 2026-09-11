@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { authenticate, requireAdmin } from "../auth.js";
 import { db } from "../db.js";
+import { EMPTY_RATING, gameRatings } from "../stats.js";
 import { broadcast } from "../ws.js";
 
 const MODES = ["auto", "hidden", "standalone"] as const;
@@ -98,6 +99,7 @@ export default async function libraryRoutes(app: FastifyInstance) {
       .all() as Row[];
 
     const series = detectSeries(rows);
+    const ratings = gameRatings();
 
     return {
       games: rows.map((r) => ({
@@ -109,6 +111,7 @@ export default async function libraryRoutes(app: FastifyInstance) {
         isExpansion: !!r.is_expansion,
         mode: (r.expansion_mode ?? "auto") as Mode,
         series: series.get(r.id) ?? null,
+        rating: ratings.get(r.id) ?? EMPTY_RATING,
         // What the deck does with it today, once the override is applied.
         hidden: r.expansion_mode === "hidden" || (r.expansion_mode === "auto" && !!r.is_expansion),
       })),

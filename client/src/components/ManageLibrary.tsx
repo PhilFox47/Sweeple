@@ -1,10 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type ExpansionMode, type LibraryGame } from "../api";
+import { api, type ExpansionMode, type GameRating, type LibraryGame } from "../api";
 
 function range(min: number | null, max: number | null): string | null {
   if (!min && !max) return null;
   if (min && max && min !== max) return `${min}–${max} players`;
   return `${min ?? max} players`;
+}
+
+const pct = (ratio: number) => `${Math.round(ratio * 100)}%`;
+
+/** Enough votes to mean something, and picked rarely enough to be worth a look. */
+const UNPOPULAR_VOTES = 3;
+const UNPOPULAR_RATIO = 0.34;
+
+function rateClass(ratio: number): string {
+  if (ratio <= UNPOPULAR_RATIO) return "rate-low";
+  if (ratio >= 0.66) return "rate-high";
+  return "rate-mid";
+}
+
+function PickRating({ rating }: { rating: GameRating }) {
+  if (rating.total === 0) return <span className="library-rating is-empty">No votes yet</span>;
+  return (
+    <span className="library-rating">
+      <span className={`rate ${rateClass(rating.ratio ?? 0)}`}>{pct(rating.ratio ?? 0)} picked</span>
+      <span className="rate-total">
+        {rating.total} {rating.total === 1 ? "vote" : "votes"}
+      </span>
+      {rating.byPlayer.map((p) => (
+        <span className="rate-player" key={p.id}>
+          {p.displayName} {pct(p.likes / p.total)} ({p.total})
+        </span>
+      ))}
+    </span>
+  );
 }
 
 interface Group {
@@ -55,6 +84,21 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
     }
 
     const out: Group[] = [];
+
+    // The point of tracking picks: the games that keep getting turned down, gathered up so they
+    // can be hidden in one pass. They also stay in their own section below.
+    const unpopular = games
+      .filter((g) => !g.hidden && g.rating.total >= UNPOPULAR_VOTES && (g.rating.ratio ?? 1) <= UNPOPULAR_RATIO)
+      .sort((a, b) => (a.rating.ratio ?? 1) - (b.rating.ratio ?? 1));
+    if (unpopular.length) {
+      out.push({
+        key: "unpopular",
+        title: "Rarely picked",
+        hint: `turned down most of the time`,
+        games: unpopular,
+      });
+    }
+
     const bySeries = new Map<string, LibraryGame[]>();
     for (const game of games) {
       if (!game.series) continue;
@@ -150,6 +194,7 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
+                <PickRating rating={game.rating} />
               </div>
               <div className="segmented">
                 <button

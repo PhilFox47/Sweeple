@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { authenticate } from "../auth.js";
-import { matchParticipantIds } from "../rounds.js";
+import { activeRoundId, matchParticipantIds } from "../rounds.js";
 import { broadcast } from "../ws.js";
 
 function reconcileMatch(gameId: number) {
@@ -44,6 +44,14 @@ export default async function swipesRoutes(app: FastifyInstance) {
          ON CONFLICT(user_id, game_id) DO UPDATE SET decision = excluded.decision, created_at = datetime('now')`
       ).run(request.user!.id, gameId, decision);
 
+      // The lasting record. Unlike swipes it is never cleared, and one row per round means
+      // changing your mind corrects tonight's vote rather than adding a second one.
+      db.prepare(
+        `INSERT INTO votes (user_id, game_id, round_id, decision) VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, game_id, round_id)
+         DO UPDATE SET decision = excluded.decision, created_at = datetime('now')`
+      ).run(request.user!.id, gameId, activeRoundId(), decision);
+
       reconcileMatch(gameId);
       return { ok: true };
     }
@@ -54,6 +62,8 @@ export default async function swipesRoutes(app: FastifyInstance) {
       db.prepare("SELECT game_id FROM swipes WHERE user_id = ?").all(request.user!.id) as { game_id: number }[]
     ).map((r) => r.game_id);
     db.prepare("DELETE FROM swipes WHERE user_id = ?").run(request.user!.id);
+    // Starting over is about this sitting, so tonight's votes go with it. Earlier rounds stand.
+    db.prepare("DELETE FROM votes WHERE user_id = ? AND round_id = ?").run(request.user!.id, activeRoundId());
     for (const gameId of gameIds) reconcileMatch(gameId);
     return { ok: true };
   });

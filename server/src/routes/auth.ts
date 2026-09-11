@@ -57,17 +57,20 @@ export default async function authRoutes(app: FastifyInstance) {
     return { ...request.user, isAdmin: request.user!.role === "core" };
   });
 
-  // Temporary players for tonight's round. Admins only.
+  /**
+   * An extra profile. These are permanent — they keep their own pick ratings across evenings —
+   * and are picked into a round like Phil and Leo. Admins only.
+   */
   app.post<{ Body: { displayName: string } }>(
-    "/api/users/guest",
+    "/api/users",
     { preHandler: [authenticate, requireAdmin] },
     async (request, reply) => {
       const displayName = request.body?.displayName?.trim();
-      if (!displayName) return reply.code(400).send({ error: "Give the player a name." });
+      if (!displayName) return reply.code(400).send({ error: "Give the profile a name." });
       if (displayName.length > 40) return reply.code(400).send({ error: "That name is too long." });
 
       // Usernames are an internal handle only; derive one that cannot collide.
-      const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "guest";
+      const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "player";
       let username = base;
       for (let n = 2; db.prepare("SELECT 1 FROM users WHERE username = ?").get(username); n++) {
         username = `${base}-${n}`;
@@ -89,15 +92,15 @@ export default async function authRoutes(app: FastifyInstance) {
       const user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(id) as
         | { id: number; role: string }
         | undefined;
-      if (!user) return reply.code(404).send({ error: "No such player." });
+      if (!user) return reply.code(404).send({ error: "No such profile." });
       if (user.role === "core") return reply.code(400).send({ error: "The permanent profiles cannot be removed." });
 
       const round = getActiveRound();
       if (round?.players.some((p) => p.id === id)) {
-        return reply.code(400).send({ error: "That player is in the running round. Start a new round first." });
+        return reply.code(400).send({ error: "That profile is in the running round. Start a new round first." });
       }
 
-      // Swipes and sessions cascade; their past matches stay as shared history.
+      // Swipes, votes and sessions cascade; past matches stay as shared history.
       db.prepare("DELETE FROM users WHERE id = ?").run(id);
       broadcast({ type: "players-changed" });
       return { ok: true };
