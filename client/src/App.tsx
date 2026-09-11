@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type CurrentUser, type Match, type Round } from "./api";
 import Toasts, { type Toast } from "./components/Toasts";
 import { IconCards, IconHeart, IconSettings } from "./components/icons";
@@ -23,22 +23,45 @@ export default function App() {
   const [syncSignal, setSyncSignal] = useState(0);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
+  const pushToast = useCallback((kind: Toast["kind"], message: string) => {
+    const id = ++toastId;
+    setToasts((prev) => [...prev, { id, kind, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5500);
+  }, []);
+
   const loadRound = useCallback(async () => {
     try {
-      setRound((await api.round()).round);
+      const { round: next } = await api.round();
+      // Keep the old object when nothing actually changed: polling would otherwise hand Swipe a
+      // new round on every tick and rebuild the deck under the player's thumb.
+      setRound((prev) => (sameRound(prev, next) ? prev : next));
     } catch {
       // Not signed in yet; the round loads again after sign-in.
     }
   }, []);
 
+  // Every match we have already told this user about, so polling can tell a new one apart from
+  // one that was on screen a moment ago. Null until the first load, which never announces.
+  const announced = useRef<Set<number> | null>(null);
+
   // Held here rather than in the Matches page so the tab badge and the list agree.
   const loadMatches = useCallback(async () => {
     try {
-      setMatches((await api.matches()).matches);
+      const { matches: next } = await api.matches();
+      setMatches(next);
+
+      const pending = next.filter((m) => !m.playedAt);
+      const seen = announced.current;
+      if (seen) {
+        for (const m of pending) {
+          if (!seen.has(m.id)) pushToast("match", `It's a match — "${m.name}" 🎉`);
+        }
+      }
+      announced.current = new Set(pending.map((m) => m.id));
     } catch {
       // Not signed in yet.
     }
-  }, []);
+  }, [pushToast]);
 
   useEffect(() => {
     api
@@ -51,16 +74,9 @@ export default function App() {
       .catch(() => setUser(null));
   }, [loadRound, loadMatches]);
 
-  const pushToast = useCallback((kind: Toast["kind"], message: string) => {
-    const id = ++toastId;
-    setToasts((prev) => [...prev, { id, kind, message }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5500);
-  }, []);
-
   const handleServerEvent = useCallback(
     (event: ServerEvent) => {
       if (event.type === "match") {
-        pushToast("match", `It's a match — "${event.gameName}" 🎉`);
         loadMatches();
       } else if (event.type === "round-changed") {
         loadRound();
@@ -98,7 +114,24 @@ export default function App() {
     loadMatches();
   }, [loadRound, loadMatches]);
 
-  useServerEvents(handleServerEvent, resync);
+  const live = useServerEvents(handleServerEvent, resync);
+
+  /**
+   * The socket is an optimisation, not the mechanism. It never connects at all behind a proxy
+   * that does not forward the upgrade, and there is no visibility change to lean on while both
+   * phones sit in the app swiping, so poll for matches regardless — briskly when the socket is
+   * down, slowly as a safety net when it is up.
+   */
+  useEffect(() => {
+    if (!user) return;
+    const every = live ? 20_000 : 4_000;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      loadMatches();
+      loadRound();
+    }, every);
+    return () => clearInterval(timer);
+  }, [user, live, loadMatches, loadRound]);
 
   // Matches waiting to be played — the round's decisions are cleared when a new one starts,
   // so this is also "how many we've found tonight".
@@ -158,6 +191,7 @@ export default function App() {
         ) : (
           <span>{user.isAdmin ? "No round yet — start one in Settings" : "Waiting for Phil or Leo to start a round"}</span>
         )}
+        {!live && <span className="live-tag" title="No live connection — checking for matches every few seconds">checking</span>}
       </div>
 
       <main className="app-main">
@@ -219,5 +253,17 @@ export default function App() {
 
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
     </div>
+  );
+}
+
+/** Two rounds are the same sitting if they are the same round with the same players. */
+function sameRound(a: Round | null | undefined, b: Round | null): boolean {
+  if (a === undefined) return false;
+  if (a === null || b === null) return a === b;
+  return (
+    a.id === b.id &&
+    a.playerCount === b.playerCount &&
+    a.players.length === b.players.length &&
+    a.players.every((p, i) => p.id === b.players[i].id)
   );
 }

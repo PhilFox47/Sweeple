@@ -98,6 +98,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     ...options,
     credentials: "include",
+    // Never let the browser or a reverse proxy answer from cache: a stale /api/matches is
+    // indistinguishable from "no new matches", and a reload would be the only way out.
+    cache: "no-store",
     // Fastify rejects a JSON content-type with an empty body, so only send it when there is one.
     headers: options.body ? { "Content-Type": "application/json", ...options.headers } : options.headers,
   });

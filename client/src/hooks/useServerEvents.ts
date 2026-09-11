@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type ServerEvent =
   | { type: "match"; gameId: number; gameName: string; thumbnail: string | null }
@@ -10,16 +10,20 @@ export type ServerEvent =
   | { type: "sync-finished"; gamesAdded: number; gamesUpdated: number; status: "success" | "error"; error?: string };
 
 /**
- * Live updates, with the assumption that the socket will drop: phones suspend it when the screen
- * locks and reverse proxies close idle connections. Anything broadcast while we were away is gone
- * for good, so `onResync` fires whenever the connection is (re)established and whenever the tab
- * becomes visible again — callers use it to refetch rather than trusting the event stream alone.
+ * Live updates, with the assumption that the socket will drop — or never connect at all. Phones
+ * suspend it when the screen locks, reverse proxies close idle connections, and a proxy that is
+ * not configured to forward the upgrade never establishes one. Anything broadcast while we were
+ * away is gone for good, so `onResync` fires whenever the connection is (re)established and
+ * whenever the tab becomes visible. The returned `live` flag says whether the socket is actually
+ * carrying events; callers poll instead when it is not, so nothing depends on the socket working.
  */
 export function useServerEvents(onEvent: (event: ServerEvent) => void, onResync?: () => void) {
   const handlerRef = useRef(onEvent);
   const resyncRef = useRef(onResync);
   handlerRef.current = onEvent;
   resyncRef.current = onResync;
+
+  const [live, setLive] = useState(false);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
@@ -31,7 +35,10 @@ export function useServerEvents(onEvent: (event: ServerEvent) => void, onResync?
       if (closed) return;
       socket = new WebSocket(`${protocol}://${window.location.host}/ws`);
 
-      socket.onopen = () => resyncRef.current?.();
+      socket.onopen = () => {
+        setLive(true);
+        resyncRef.current?.();
+      };
 
       socket.onmessage = (event) => {
         try {
@@ -42,7 +49,8 @@ export function useServerEvents(onEvent: (event: ServerEvent) => void, onResync?
       };
 
       socket.onclose = () => {
-        if (!closed) reconnectTimer = setTimeout(connect, 2000);
+        setLive(false);
+        if (!closed) reconnectTimer = setTimeout(connect, 3000);
       };
 
       // A socket that errors is about to close; let onclose drive the retry.
@@ -69,4 +77,6 @@ export function useServerEvents(onEvent: (event: ServerEvent) => void, onResync?
       socket?.close();
     };
   }, []);
+
+  return live;
 }

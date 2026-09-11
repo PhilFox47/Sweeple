@@ -264,6 +264,21 @@ textarea:focus {
   color: var(--text);
 }
 
+/* Shown when the live connection is not available and matches are being polled instead. */
+.live-tag {
+  margin-left: auto;
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+
 .round-dot {
   width: 7px;
   height: 7px;

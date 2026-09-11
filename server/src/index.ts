@@ -28,6 +28,17 @@ await app.register(cors, { origin: process.env.CORS_ORIGIN ?? true, credentials:
 await app.register(cookie);
 await app.register(websocket);
 
+/**
+ * API responses are per-request state, never cacheable. Said out loud because a reverse proxy
+ * that caches GET /api/matches looks exactly like matches that only appear after a reload.
+ */
+app.addHook("onSend", async (request, reply) => {
+  if (request.raw.url?.startsWith("/api")) {
+    reply.header("Cache-Control", "no-store, no-cache, must-revalidate");
+    reply.header("Pragma", "no-cache");
+  }
+});
+
 app.get("/ws", { websocket: true }, (socket) => {
   registerClient(socket);
 });
