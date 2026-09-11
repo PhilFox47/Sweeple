@@ -234,6 +234,25 @@ export interface CollectionItem {
   thumbnail: string | null;
   image: string | null;
   isExpansion: boolean;
+  numPlays: number;
+}
+
+export function parseCollectionXml(xml: string): CollectionItem[] {
+  assertNoXmlError(xml, "collection");
+  const doc = parser.parse(xml);
+  if (!doc?.items) throw new Error("That does not look like a BGG collection response.");
+
+  return toArray(doc.items.item).map((item: any) => ({
+    bggId: Number(item["@_objectid"]),
+    name: typeof item.name === "object" ? item.name["#text"] ?? item.name : String(item.name),
+    yearPublished: item.yearpublished !== undefined ? Number(item.yearpublished) : null,
+    thumbnail: item.thumbnail ?? null,
+    image: item.image ?? null,
+    // Collections report expansions as subtype "boardgame" too, so this is only a hint;
+    // the thing endpoint is authoritative and corrects it when details are imported.
+    isExpansion: item["@_subtype"] === "boardgameexpansion",
+    numPlays: item.numplays !== undefined ? Number(item.numplays) : 0,
+  }));
 }
 
 export async function fetchCollection(
@@ -241,24 +260,21 @@ export async function fetchCollection(
   options: BggRequestOptions = {}
 ): Promise<CollectionItem[]> {
   // One request for the whole collection. BGG queues collection exports per user, so asking
-  // twice at once (games and expansions separately) makes it reject one of them. The default
-  // response already includes expansions, each item tagged with its own subtype.
+  // twice at once (games and expansions separately) makes it reject one of them.
   const xml = await fetchWithRetry(
     `${BASE}/collection?username=${encodeURIComponent(username)}&own=1`,
     "collection",
     options
   );
-  assertNoXmlError(xml, "collection");
+  return parseCollectionXml(xml);
+}
 
-  const doc = parser.parse(xml);
-  return toArray(doc?.items?.item).map((item: any) => ({
-    bggId: Number(item["@_objectid"]),
-    name: typeof item.name === "object" ? item.name["#text"] ?? item.name : item.name,
-    yearPublished: item.yearpublished !== undefined ? Number(item.yearpublished) : null,
-    thumbnail: item.thumbnail ?? null,
-    image: item.image ?? null,
-    isExpansion: item["@_subtype"] === "boardgameexpansion",
-  }));
+export function collectionUrl(username: string): string {
+  return `${BASE}/collection?username=${encodeURIComponent(username)}&own=1`;
+}
+
+export function thingUrl(bggIds: number[]): string {
+  return `${BASE}/thing?id=${bggIds.join(",")}&stats=1`;
 }
 
 export interface GameDetails {
@@ -277,6 +293,43 @@ export interface GameDetails {
   bggRank: number | null;
   categories: string[];
   mechanics: string[];
+  isExpansion: boolean;
+}
+
+export function parseThingXml(xml: string): GameDetails[] {
+  assertNoXmlError(xml, "game details");
+  const doc = parser.parse(xml);
+  if (!doc?.items) throw new Error("That does not look like a BGG thing (game details) response.");
+
+  return toArray(doc.items.item).map((item: any) => {
+    const names = toArray(item.name);
+    const primaryName = names.find((n: any) => n["@_type"] === "primary")?.["@_value"] ?? names[0]?.["@_value"] ?? "Unknown";
+    const links = toArray(item.link);
+    const categories = links.filter((l: any) => l["@_type"] === "boardgamecategory").map((l: any) => l["@_value"]);
+    const mechanics = links.filter((l: any) => l["@_type"] === "boardgamemechanic").map((l: any) => l["@_value"]);
+    const stats = item.statistics?.ratings;
+    const rank = toArray(stats?.ranks?.rank).find((r: any) => r["@_name"] === "boardgame");
+
+    return {
+      bggId: Number(item["@_id"]),
+      name: primaryName,
+      yearPublished: item.yearpublished?.["@_value"] !== undefined ? Number(item.yearpublished["@_value"]) : null,
+      thumbnail: item.thumbnail ?? null,
+      image: item.image ?? null,
+      minPlayers: item.minplayers?.["@_value"] !== undefined ? Number(item.minplayers["@_value"]) : null,
+      maxPlayers: item.maxplayers?.["@_value"] !== undefined ? Number(item.maxplayers["@_value"]) : null,
+      minPlaytime: item.minplaytime?.["@_value"] !== undefined ? Number(item.minplaytime["@_value"]) : null,
+      maxPlaytime: item.maxplaytime?.["@_value"] !== undefined ? Number(item.maxplaytime["@_value"]) : null,
+      playingTime: item.playingtime?.["@_value"] !== undefined ? Number(item.playingtime["@_value"]) : null,
+      weight: stats?.averageweight?.["@_value"] !== undefined ? Number(stats.averageweight["@_value"]) : null,
+      averageRating: stats?.average?.["@_value"] !== undefined ? Number(stats.average["@_value"]) : null,
+      bggRank: rank && rank["@_value"] !== "Not Ranked" ? Number(rank["@_value"]) : null,
+      categories,
+      mechanics,
+      // Only the thing endpoint distinguishes these; a collection lists expansions as "boardgame".
+      isExpansion: item["@_type"] === "boardgameexpansion",
+    };
+  });
 }
 
 export async function fetchGameDetails(
@@ -288,39 +341,9 @@ export async function fetchGameDetails(
   const totalChunks = Math.ceil(bggIds.length / chunkSize);
   for (let i = 0; i < bggIds.length; i += chunkSize) {
     const chunk = bggIds.slice(i, i + chunkSize);
-    const url = `${BASE}/thing?id=${chunk.join(",")}&stats=1`;
     options.onProgress?.(`Fetching game details ${Math.floor(i / chunkSize) + 1}/${totalChunks}`);
-    const xml = await fetchWithRetry(url, "game details", options);
-    const doc = parser.parse(xml);
-    const items = toArray(doc?.items?.item);
-
-    for (const item of items) {
-      const names = toArray(item.name);
-      const primaryName = names.find((n: any) => n["@_type"] === "primary")?.["@_value"] ?? names[0]?.["@_value"] ?? "Unknown";
-      const links = toArray(item.link);
-      const categories = links.filter((l: any) => l["@_type"] === "boardgamecategory").map((l: any) => l["@_value"]);
-      const mechanics = links.filter((l: any) => l["@_type"] === "boardgamemechanic").map((l: any) => l["@_value"]);
-      const stats = item.statistics?.ratings;
-      const rank = toArray(stats?.ranks?.rank).find((r: any) => r["@_name"] === "boardgame");
-
-      results.push({
-        bggId: Number(item["@_id"]),
-        name: primaryName,
-        yearPublished: item.yearpublished?.["@_value"] !== undefined ? Number(item.yearpublished["@_value"]) : null,
-        thumbnail: item.thumbnail ?? null,
-        image: item.image ?? null,
-        minPlayers: item.minplayers?.["@_value"] !== undefined ? Number(item.minplayers["@_value"]) : null,
-        maxPlayers: item.maxplayers?.["@_value"] !== undefined ? Number(item.maxplayers["@_value"]) : null,
-        minPlaytime: item.minplaytime?.["@_value"] !== undefined ? Number(item.minplaytime["@_value"]) : null,
-        maxPlaytime: item.maxplaytime?.["@_value"] !== undefined ? Number(item.maxplaytime["@_value"]) : null,
-        playingTime: item.playingtime?.["@_value"] !== undefined ? Number(item.playingtime["@_value"]) : null,
-        weight: stats?.averageweight?.["@_value"] !== undefined ? Number(stats.averageweight["@_value"]) : null,
-        averageRating: stats?.average?.["@_value"] !== undefined ? Number(stats.average["@_value"]) : null,
-        bggRank: rank && rank["@_value"] !== "Not Ranked" ? Number(rank["@_value"]) : null,
-        categories,
-        mechanics,
-      });
-    }
+    const xml = await fetchWithRetry(thingUrl(chunk), "game details", options);
+    results.push(...parseThingXml(xml));
     // Be polite to BGG's API between chunks.
     if (i + chunkSize < bggIds.length) await sleep(1500, options.signal);
   }
@@ -331,6 +354,28 @@ export interface PlayStats {
   bggId: number;
   numPlays: number;
   lastPlayedAt: string | null;
+}
+
+/** Aggregates one page of play records. Callers merge pages via `mergePlayStats`. */
+export function parsePlaysXml(xml: string, into = new Map<number, PlayStats>()): Map<number, PlayStats> {
+  assertNoXmlError(xml, "play history");
+  const doc = parser.parse(xml);
+  if (!doc?.plays) throw new Error("That does not look like a BGG plays response.");
+
+  for (const play of toArray(doc.plays.play)) {
+    const bggId = Number((play as any).item?.["@_objectid"]);
+    if (!bggId) continue;
+    const date: string = (play as any)["@_date"];
+    const quantity = Number((play as any)["@_quantity"] ?? 1) || 1;
+    const existing = into.get(bggId);
+    if (existing) {
+      existing.numPlays += quantity;
+      if (!existing.lastPlayedAt || date > existing.lastPlayedAt) existing.lastPlayedAt = date;
+    } else {
+      into.set(bggId, { bggId, numPlays: quantity, lastPlayedAt: date });
+    }
+  }
+  return into;
 }
 
 export async function fetchPlayStats(
@@ -346,19 +391,7 @@ export async function fetchPlayStats(
     const doc = parser.parse(xml);
     const plays = toArray(doc?.plays?.play);
     if (plays.length === 0) break;
-
-    for (const play of plays) {
-      const bggId = Number(play.item?.["@_objectid"]);
-      if (!bggId) continue;
-      const date: string = play["@_date"];
-      const existing = stats.get(bggId);
-      if (existing) {
-        existing.numPlays += 1;
-        if (!existing.lastPlayedAt || date > existing.lastPlayedAt) existing.lastPlayedAt = date;
-      } else {
-        stats.set(bggId, { bggId, numPlays: 1, lastPlayedAt: date });
-      }
-    }
+    parsePlaysXml(xml, stats);
 
     const total = Number(doc?.plays?.["@_total"] ?? 0);
     if (page * 100 >= total) break;

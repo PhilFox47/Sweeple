@@ -6,7 +6,7 @@ import GameCard from "../components/GameCard";
 
 type SwipeDirection = "left" | "right" | "up" | "down";
 
-export default function Swipe() {
+export default function Swipe({ refreshToken }: { refreshToken: number }) {
   const [deck, setDeck] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function Swipe() {
 
   useEffect(() => {
     loadDeck(filters);
-  }, [filters, loadDeck]);
+  }, [filters, loadDeck, refreshToken]);
 
   async function handleDecision(game: Game, direction: SwipeDirection) {
     if (direction !== "left" && direction !== "right") return;

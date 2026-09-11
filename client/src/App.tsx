@@ -4,10 +4,11 @@ import SyncControl from "./components/SyncControl";
 import Toasts, { type Toast } from "./components/Toasts";
 import { useServerEvents, type ServerEvent } from "./hooks/useServerEvents";
 import Login from "./pages/Login";
+import Import from "./pages/Import";
 import Matches from "./pages/Matches";
 import Swipe from "./pages/Swipe";
 
-type Tab = "swipe" | "matches";
+type Tab = "swipe" | "matches" | "import";
 
 let toastId = 0;
 
@@ -16,6 +17,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("swipe");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [matchesRefresh, setMatchesRefresh] = useState(0);
+  const [libraryRefresh, setLibraryRefresh] = useState(0);
   const [syncSignal, setSyncSignal] = useState(0);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
@@ -40,6 +42,8 @@ export default function App() {
       } else if (event.type === "sync-started") {
         setSyncProgress(null);
         setSyncSignal((n) => n + 1);
+      } else if (event.type === "library-changed") {
+        setLibraryRefresh((n) => n + 1);
       } else if (event.type === "sync-progress") {
         setSyncProgress(event.message);
       } else if (event.type === "sync-finished") {
@@ -88,11 +92,17 @@ export default function App() {
         <button className={tab === "matches" ? "tab-active" : ""} onClick={() => setTab("matches")}>
           Matches
         </button>
+        <button className={tab === "import" ? "tab-active" : ""} onClick={() => setTab("import")}>
+          Import
+        </button>
       </nav>
 
       <main className="app-main">
-        {tab === "swipe" && <Swipe />}
+        {tab === "swipe" && <Swipe refreshToken={libraryRefresh} />}
         {tab === "matches" && <Matches refreshToken={matchesRefresh} />}
+        {tab === "import" && (
+          <Import refreshToken={libraryRefresh} onImported={() => setLibraryRefresh((n) => n + 1)} />
+        )}
       </main>
 
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />

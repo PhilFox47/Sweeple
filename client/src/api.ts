@@ -34,6 +34,15 @@ export interface Match {
   weight: number | null;
 }
 
+export interface ImportLinks {
+  username: string;
+  collectionUrl: string;
+  playsUrl: string;
+  detailBatches: { url: string; count: number }[];
+  gamesTotal: number;
+  gamesWithDetails: number;
+}
+
 export interface CurrentUser {
   id: number;
   username: string;
@@ -96,6 +105,10 @@ export const api = {
 
   matches: () => request<{ matches: Match[] }>("/api/matches"),
   markPlayed: (matchId: number) => request<{ ok: true }>(`/api/matches/${matchId}/played`, { method: "POST" }),
+
+  importLinks: () => request<ImportLinks>("/api/import/links"),
+  importXml: (xml: string) =>
+    request<{ kind: string; message: string }>("/api/import", { method: "POST", body: JSON.stringify({ xml }) }),
 
   triggerSync: () => request<{ ok: true; started: boolean }>("/api/sync", { method: "POST" }),
   stopSync: () => request<{ ok: true; stopped: boolean }>("/api/sync/stop", { method: "POST" }),

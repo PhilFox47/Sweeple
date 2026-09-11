@@ -4,6 +4,7 @@ export type ServerEvent =
   | { type: "match"; gameId: number; gameName: string; thumbnail: string | null }
   | { type: "sync-started" }
   | { type: "sync-progress"; message: string }
+  | { type: "library-changed" }
   | { type: "sync-finished"; gamesAdded: number; gamesUpdated: number; status: "success" | "error"; error?: string };
 
 export function useServerEvents(onEvent: (event: ServerEvent) => void) {
