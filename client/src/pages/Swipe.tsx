@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import TinderCard from "react-tinder-card";
 import { api, type Filters, type Game, type Round } from "../api";
+import DeckCard, { type SwipeDirection } from "../components/DeckCard";
 import FilterSheet from "../components/FilterSheet";
-import GameCard from "../components/GameCard";
 import { IconHeartFilled, IconSliders, IconX } from "../components/icons";
-
-type SwipeDirection = "left" | "right" | "up" | "down";
 
 /**
  * Only a few cards are mounted at a time. Rendering the whole deck meant ~80 animated card
@@ -38,7 +35,6 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({});
   const [showFilters, setShowFilters] = useState(false);
-  const [stamp, setStamp] = useState<"left" | "right" | null>(null);
   const cardRefs = useRef<Record<number, any>>({});
 
   const loadDeck = useCallback(async (currentFilters: Filters, playerCount?: number) => {
@@ -63,8 +59,9 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
     loadDeck(filters, round?.playerCount);
   }, [filters, loadDeck, refreshToken, round?.playerCount]);
 
-  async function handleDecision(game: Game, direction: SwipeDirection) {
-    setStamp(null);
+  // Stable so the cards never rebuild their drag listeners: doing so mid-gesture resets the
+  // drag origin and the card jumps back to the centre.
+  const handleDecision = useCallback(async (game: Game, direction: SwipeDirection) => {
     if (direction !== "left" && direction !== "right") return;
     const decision = direction === "right" ? "like" : "dislike";
     setDeck((prev) => prev.filter((g) => g.id !== game.id));
@@ -73,7 +70,11 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record swipe");
     }
-  }
+  }, []);
+
+  const registerRef = useCallback((id: number, el: unknown) => {
+    cardRefs.current[id] = el;
+  }, []);
 
   function swipeTop(direction: "left" | "right") {
     const top = deck[0];
@@ -118,42 +119,16 @@ export default function Swipe({ refreshToken, round }: { refreshToken: number; r
         )}
 
         {!loading &&
-          stackOrder.map((game) => {
-            const depth = visible.indexOf(game);
-            const isTop = depth === 0;
-            return (
-              <TinderCard
-                ref={(el) => {
-                  cardRefs.current[game.id] = el;
-                }}
-                key={game.id}
-                className="deck-card"
-                onSwipe={(dir) => handleDecision(game, dir as SwipeDirection)}
-                preventSwipe={["up", "down"]}
-                swipeRequirementType="position"
-                swipeThreshold={90}
-                onSwipeRequirementFulfilled={(dir) => {
-                  if (isTop && (dir === "left" || dir === "right")) setStamp(dir);
-                }}
-                onSwipeRequirementUnfulfilled={() => isTop && setStamp(null)}
-              >
-                <div
-                  className="deck-card-inner"
-                  style={{
-                    // Cards behind sit slightly back for depth.
-                    transform: `scale(${1 - depth * 0.035}) translateY(${depth * 12}px)`,
-                  }}
-                >
-                  <GameCard
-                    game={game}
-                    playerCount={round?.playerCount}
-                    stamp={isTop ? stamp : null}
-                    eager={depth < 2}
-                  />
-                </div>
-              </TinderCard>
-            );
-          })}
+          stackOrder.map((game) => (
+            <DeckCard
+              key={game.id}
+              game={game}
+              depth={visible.indexOf(game)}
+              playerCount={round?.playerCount}
+              onDecision={handleDecision}
+              registerRef={registerRef}
+            />
+          ))}
       </div>
 
       <div className="deck-controls">
