@@ -15,12 +15,14 @@ function reconcileMatch(gameId: number) {
   const likedUserIds = new Set(likes.map((l) => l.user_id));
   const allCoreLiked = participants.every((id) => likedUserIds.has(id));
 
-  const existingMatch = db.prepare("SELECT id, played_at FROM matches WHERE game_id = ?").get(gameId) as
-    | { id: number; played_at: string | null }
-    | undefined;
+  // Scoped to this sitting: what an earlier evening agreed on has no bearing on tonight.
+  const roundId = activeRoundId();
+  const existingMatch = db
+    .prepare("SELECT id, played_at FROM matches WHERE game_id = ? AND round_id = ?")
+    .get(gameId, roundId) as { id: number; played_at: string | null } | undefined;
 
   if (allCoreLiked && !existingMatch) {
-    db.prepare("INSERT INTO matches (game_id) VALUES (?)").run(gameId);
+    db.prepare("INSERT INTO matches (game_id, round_id) VALUES (?, ?)").run(gameId, roundId);
     const game = db.prepare("SELECT name, thumbnail FROM games WHERE id = ?").get(gameId) as
       | { name: string; thumbnail: string | null }
       | undefined;

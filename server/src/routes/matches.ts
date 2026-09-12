@@ -1,8 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { authenticate } from "../auth.js";
+import { activeRoundId } from "../rounds.js";
 
 export default async function matchesRoutes(app: FastifyInstance) {
+  /**
+   * Tonight's matches only. Starting a round is a fresh search for something to play, so what
+   * the previous sitting agreed on — including what it played — is not part of this list. The
+   * rows stay in the database; they are simply not this evening's business.
+   */
   app.get("/api/matches", { preHandler: authenticate }, async () => {
     const rows = db
       .prepare(
@@ -10,9 +16,10 @@ export default async function matchesRoutes(app: FastifyInstance) {
                 g.id as gameId, g.name, g.thumbnail, g.image, g.min_players as minPlayers,
                 g.max_players as maxPlayers, g.playing_time as playingTime, g.weight
          FROM matches m JOIN games g ON g.id = m.game_id
+         WHERE m.round_id = ?
          ORDER BY m.played_at IS NOT NULL, m.created_at DESC`
       )
-      .all();
+      .all(activeRoundId());
     return { matches: rows };
   });
 

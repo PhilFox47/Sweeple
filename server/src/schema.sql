@@ -67,9 +67,13 @@ CREATE INDEX IF NOT EXISTS idx_votes_user_game ON votes(user_id, game_id);
 
 CREATE TABLE IF NOT EXISTS matches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  game_id INTEGER NOT NULL UNIQUE REFERENCES games(id) ON DELETE CASCADE,
+  game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  -- The sitting this match belongs to; the Matches tab only shows the running one. Unique per
+  -- round rather than per game: a game agreed on months ago can be agreed on again tonight.
+  round_id INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  played_at TEXT
+  played_at TEXT,
+  UNIQUE(game_id, round_id)
 );
 
 -- A swipe round is one sitting: a fixed set of players deciding on a game together.

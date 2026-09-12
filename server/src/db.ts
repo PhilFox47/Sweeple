@@ -20,11 +20,12 @@ db.exec(schema);
  * CREATE TABLE IF NOT EXISTS never alters an existing table, so columns added after a database
  * was first created have to be filled in here. Existing rows keep their data.
  */
-function addColumnIfMissing(table: string, column: string, definition: string) {
+function addColumnIfMissing(table: string, column: string, definition: string): boolean {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-  if (columns.some((c) => c.name === column)) return;
+  if (columns.some((c) => c.name === column)) return false;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   console.log(`[db] migrated: added ${table}.${column}`);
+  return true;
 }
 
 addColumnIfMissing("games", "best_players", "TEXT NOT NULL DEFAULT '[]'");
@@ -32,6 +33,56 @@ addColumnIfMissing("games", "recommended_players", "TEXT NOT NULL DEFAULT '[]'")
 // Manual override of whether a game counts as an expansion. "auto" defers to BGG's own flag.
 // Deliberately never written by syncing or importing, so choices survive a library refresh.
 addColumnIfMissing("games", "expansion_mode", "TEXT NOT NULL DEFAULT 'auto'");
+
+// Which sitting a match belongs to, so the Matches tab is about tonight rather than every
+// evening ever. 0 means a match made before rounds were recorded, or with no round running.
+if (addColumnIfMissing("matches", "round_id", "INTEGER NOT NULL DEFAULT 0")) {
+  // An upgrade in the middle of an evening: the matches still waiting to be played belong to the
+  // round that is running, not to the pile of earlier ones.
+  const running = db.prepare("SELECT id FROM rounds WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1").get() as
+    | { id: number }
+    | undefined;
+  if (running) {
+    const adopted = db.prepare("UPDATE matches SET round_id = ? WHERE played_at IS NULL").run(running.id).changes;
+    if (adopted > 0) console.log(`[db] migrated: kept ${adopted} pending matches with the running round`);
+  }
+}
+
+/**
+ * Matches used to be unique per game for all time, which meant a game agreed on in an earlier
+ * sitting could never be agreed on again — the insert was skipped and no match appeared. They
+ * are unique per game per round now, which SQLite can only express by rebuilding the table.
+ */
+function matchesAreUniquePerGameOnly(): boolean {
+  const indexes = db.prepare("PRAGMA index_list(matches)").all() as { name: string; unique: number }[];
+  return indexes.some((idx) => {
+    if (!idx.unique) return false;
+    const columns = db.prepare(`PRAGMA index_info(${idx.name})`).all() as { name: string }[];
+    return columns.length === 1 && columns[0].name === "game_id";
+  });
+}
+
+if (matchesAreUniquePerGameOnly()) {
+  db.pragma("foreign_keys = OFF");
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE matches_rebuilt (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        round_id INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        played_at TEXT,
+        UNIQUE(game_id, round_id)
+      );
+      INSERT INTO matches_rebuilt (id, game_id, round_id, created_at, played_at)
+        SELECT id, game_id, round_id, created_at, played_at FROM matches;
+      DROP TABLE matches;
+      ALTER TABLE matches_rebuilt RENAME TO matches;
+    `);
+  })();
+  db.pragma("foreign_keys = ON");
+  console.log("[db] migrated: matches are now unique per game per round");
+}
 
 // Profile pictures live in the database rather than on disk: they are a few tens of kilobytes
 // each for a handful of profiles, and this way a backup of the database is the whole app.

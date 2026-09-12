@@ -25,6 +25,10 @@ export default function App() {
   const [syncSignal, setSyncSignal] = useState(0);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
+  // Every match we have already told this user about, so polling can tell a new one apart from
+  // one that was on screen a moment ago. Null until the first load, which never announces.
+  const announced = useRef<Set<number> | null>(null);
+
   const pushToast = useCallback((kind: Toast["kind"], message: string) => {
     const id = ++toastId;
     setToasts((prev) => [...prev, { id, kind, message }]);
@@ -43,20 +47,29 @@ export default function App() {
     }
   }, []);
 
+  // The sitting we last saw, so a round starting elsewhere is noticed. Null before the first load.
+  const seenRoundId = useRef<number | null>(null);
+
   const loadRound = useCallback(async () => {
     try {
       const { round: next } = await api.round();
       // Keep the old object when nothing actually changed: polling would otherwise hand Swipe a
       // new round on every tick and rebuild the deck under the player's thumb.
       setRound((prev) => (sameRound(prev, next) ? prev : next));
+
+      const nextId = next?.id ?? 0;
+      if (seenRoundId.current !== null && seenRoundId.current !== nextId) {
+        // A new sitting: the previous one's matches are not ours any more. Drop them here rather
+        // than leaving a stale list on screen until the refetch lands.
+        setMatches([]);
+        announced.current = null;
+      }
+      seenRoundId.current = nextId;
     } catch {
       // Not signed in yet; the round loads again after sign-in.
     }
   }, []);
 
-  // Every match we have already told this user about, so polling can tell a new one apart from
-  // one that was on screen a moment ago. Null until the first load, which never announces.
-  const announced = useRef<Set<number> | null>(null);
 
   // Held here rather than in the Matches page so the tab badge and the list agree.
   const loadMatches = useCallback(async () => {
@@ -141,7 +154,7 @@ export default function App() {
    */
   useEffect(() => {
     if (!user) return;
-    const every = live ? 20_000 : 4_000;
+    const every = live ? 8_000 : 4_000;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       loadMatches();
@@ -231,6 +244,7 @@ export default function App() {
               syncProgress={syncProgress}
               onChanged={() => {
                 loadRound();
+                loadMatches();
                 loadMe();
                 setLibraryRefresh((n) => n + 1);
               }}
