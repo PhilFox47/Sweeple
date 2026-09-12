@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { authenticate } from "../auth.js";
+import { OPENING_CARDS, openingHands, weightFor, weightedOrder, type Candidate } from "../deck.js";
+import { activeRoundId, getActiveRound } from "../rounds.js";
 import { ratingsForUser } from "../stats.js";
 
 interface GameRow {
@@ -88,6 +90,19 @@ function parseFilters(query: Record<string, unknown>): GameFilters {
   };
 }
 
+/**
+ * The games an opening hand may be dealt from: everything that could be played tonight, before
+ * anyone's personal filters narrow it down.
+ */
+function openingPoolClause(playerCount: number | undefined): string {
+  const clauses = ["owned = 1", NOT_HIDDEN, `NOT ${IS_EXPANSION}`];
+  if (playerCount !== undefined) {
+    clauses.push("(min_players IS NULL OR min_players <= @playerCount)");
+    clauses.push("(max_players IS NULL OR max_players >= @playerCount)");
+  }
+  return clauses.join(" AND ");
+}
+
 function buildWhere(filters: GameFilters): { clause: string; params: Record<string, unknown> } {
   const clauses: string[] = ["owned = 1"];
   const params: Record<string, unknown> = {};
@@ -143,24 +158,81 @@ export default async function gamesRoutes(app: FastifyInstance) {
     return { games: rows.map(serializeGame) };
   });
 
-  // The swipeable deck: games matching filters that the current user hasn't decided on yet.
+  /**
+   * The swipeable deck: games matching the filters that this player has not decided on yet,
+   * in the order they should be dealt. See deck.ts for why the order is what it is.
+   */
   app.get("/api/games/deck", { preHandler: authenticate }, async (request) => {
     const filters = parseFilters(request.query as Record<string, unknown>);
     const { clause, params } = buildWhere(filters);
+    const userId = request.user!.id;
+
+    const round = getActiveRound();
+    // Whoever is swiping gets an opening hand, even if they are not in the round's line-up.
+    const participants = round?.players.map((p) => p.id) ?? [];
+    const dealtTo = participants.includes(userId) ? participants : [...participants, userId];
+
     const rows = db
       .prepare(
-        `SELECT * FROM games
+        `SELECT g.*,
+                (SELECT MAX(v.created_at) FROM votes v WHERE v.game_id = g.id AND v.user_id = @userId) AS last_voted_at,
+                (SELECT COUNT(*) FROM swipes s WHERE s.game_id = g.id AND s.user_id <> @userId AND s.decision = 'like') AS liked_by_others,
+                (SELECT COUNT(*) FROM swipes s WHERE s.game_id = g.id AND s.user_id <> @userId AND s.decision = 'dislike') AS disliked_by_others
+         FROM games g
          WHERE ${clause}
-           AND id NOT IN (SELECT game_id FROM swipes WHERE user_id = @userId)
-         ORDER BY name`
+           AND g.id NOT IN (SELECT game_id FROM swipes WHERE user_id = @userId)
+         ORDER BY g.id`
       )
-      .all({ ...params, userId: request.user!.id }) as GameRow[];
+      .all({ ...params, userId }) as (GameRow & {
+      last_voted_at: string | null;
+      liked_by_others: number;
+      disliked_by_others: number;
+    })[];
+
+    // How far into their own deck this player is. Swipes are cleared when a round starts, so
+    // this counts tonight only.
+    const position = (
+      db.prepare("SELECT COUNT(*) AS n FROM swipes WHERE user_id = ?").get(userId) as { n: number }
+    ).n;
+
+    const candidates = new Map<number, Candidate>(
+      rows.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          bestPlayers: JSON.parse(row.best_players ?? "[]") as number[],
+          recommendedPlayers: JSON.parse(row.recommended_players ?? "[]") as number[],
+          lastVotedAt: row.last_voted_at,
+          likedByOthers: row.liked_by_others,
+          dislikedByOthers: row.disliked_by_others,
+        },
+      ])
+    );
+
+    let ordered: GameRow[];
+    if (position < OPENING_CARDS) {
+      // The opening hands are dealt from the round's own pool rather than each player's filters,
+      // so one player narrowing their filters cannot hand their games to somebody else.
+      const pool = db
+        .prepare(`SELECT id FROM games WHERE ${openingPoolClause(round?.playerCount)} ORDER BY id`)
+        .all(round?.playerCount ? { playerCount: round.playerCount } : {}) as { id: number }[];
+      const hand = openingHands(pool.map((g) => g.id), dealtTo, activeRoundId()).get(userId) ?? [];
+
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const opening = hand.map((id) => byId.get(id)).filter((row): row is (typeof rows)[number] => Boolean(row));
+      const openingIds = new Set(opening.map((row) => row.id));
+      const rest = rows.filter((row) => !openingIds.has(row.id));
+      ordered = [...opening, ...weightedOrder(rest, (row) => weightFor(candidates.get(row.id)!, { position, playerCount: filters.playerCount }))];
+    } else {
+      ordered = weightedOrder(rows, (row) => weightFor(candidates.get(row.id)!, { position, playerCount: filters.playerCount }));
+    }
 
     // Your own history with each game, so the card can say "you liked this 2 of 3 times".
     // Deliberately only your own: what the others think is the point of the round.
-    const mine = ratingsForUser(request.user!.id);
+    const mine = ratingsForUser(userId);
     return {
-      games: rows.map((row) => ({ ...serializeGame(row), yourVotes: mine.get(row.id) ?? { likes: 0, total: 0 } })),
+      position,
+      games: ordered.map((row) => ({ ...serializeGame(row), yourVotes: mine.get(row.id) ?? { likes: 0, total: 0 } })),
     };
   });
 

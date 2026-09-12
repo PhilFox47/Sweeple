@@ -11,24 +11,6 @@ import { IconHeartFilled, IconSliders, IconX } from "../components/icons";
  */
 const VISIBLE_CARDS = 3;
 
-/**
- * Games BGG rates as "best with" the current group get a head start, without excluding the rest:
- * each game draws a random key and matching games subtract a bonus, so they cluster early but
- * everything still mixes in. 0.15 puts one first ~70% of the time against 50% by chance;
- * much past 0.2 and the other games stop showing up.
- */
-const BEST_WITH_BONUS = 0.15;
-
-function orderDeck(games: Game[], playerCount?: number): Game[] {
-  return games
-    .map((game) => {
-      const bonus = playerCount !== undefined && game.bestPlayers.includes(playerCount) ? BEST_WITH_BONUS : 0;
-      return { game, key: Math.random() - bonus };
-    })
-    .sort((a, b) => a.key - b.key)
-    .map((entry) => entry.game);
-}
-
 export default function Swipe({
   refreshToken,
   round,
@@ -45,6 +27,9 @@ export default function Swipe({
   const cardRefs = useRef<Record<number, any>>({});
   // Responses can land out of order; only the newest request may write the deck.
   const requestId = useRef(0);
+  // Read inside the swipe handler, which has to stay referentially stable: rebuilding it
+  // mid-gesture resets the drag origin and the card jumps back to the centre.
+  const filtersRef = useRef<Filters>({});
 
   /**
    * The round's size is the default player count, overridable in the filter sheet. Derived in
@@ -63,7 +48,7 @@ export default function Swipe({
     try {
       const { games } = await api.deck(currentFilters);
       if (id !== requestId.current) return;
-      setDeck(orderDeck(games, currentFilters.playerCount));
+      setDeck(games);
     } catch (err) {
       if (id !== requestId.current) return;
       setError(err instanceof Error ? err.message : "Failed to load games");
@@ -72,7 +57,29 @@ export default function Swipe({
     }
   }, []);
 
+  /**
+   * The order depends on how far along you are and on what the others have liked so far, so it
+   * is worked out again after every swipe. The card already on top stays on top — the rest of
+   * the stack is what gets re-ordered, which the player cannot see happening.
+   */
+  const redealBelowTop = useCallback(async (currentFilters: Filters) => {
+    const id = ++requestId.current;
+    try {
+      const { games } = await api.deck(currentFilters);
+      if (id !== requestId.current) return;
+      setDeck((prev) => {
+        const top = prev[0];
+        if (!top) return games;
+        const rest = games.filter((game) => game.id !== top.id);
+        return games.some((game) => game.id === top.id) ? [top, ...rest] : games;
+      });
+    } catch {
+      // The deck on screen is still good enough to keep swiping; the next fetch can fix it.
+    }
+  }, []);
+
   useEffect(() => {
+    filtersRef.current = effectiveFilters;
     // Wait for the round to resolve, otherwise the first fetch goes out unfiltered.
     if (round === undefined) return;
     loadDeck(effectiveFilters);
@@ -86,10 +93,11 @@ export default function Swipe({
     setDeck((prev) => prev.filter((g) => g.id !== game.id));
     try {
       await api.swipe(game.id, decision);
+      await redealBelowTop(filtersRef.current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record swipe");
     }
-  }, []);
+  }, [redealBelowTop]);
 
   const registerRef = useCallback((id: number, el: unknown) => {
     cardRefs.current[id] = el;
