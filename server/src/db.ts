@@ -33,6 +33,13 @@ addColumnIfMissing("games", "recommended_players", "TEXT NOT NULL DEFAULT '[]'")
 // Deliberately never written by syncing or importing, so choices survive a library refresh.
 addColumnIfMissing("games", "expansion_mode", "TEXT NOT NULL DEFAULT 'auto'");
 
+// Profile pictures live in the database rather than on disk: they are a few tens of kilobytes
+// each for a handful of profiles, and this way a backup of the database is the whole app.
+addColumnIfMissing("users", "avatar", "BLOB");
+addColumnIfMissing("users", "avatar_type", "TEXT");
+// Part of the avatar URL, so a new picture is fetched immediately while old ones cache forever.
+addColumnIfMissing("users", "avatar_version", "INTEGER NOT NULL DEFAULT 0");
+
 /**
  * Votes were introduced after the app had been in use, and the swipes sitting in the database at
  * that point are real decisions. Carry them over once so the first ratings are not empty.

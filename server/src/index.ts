@@ -14,6 +14,7 @@ import libraryRoutes from "./routes/library.js";
 import matchesRoutes from "./routes/matches.js";
 import roundRoutes from "./routes/rounds.js";
 import swipesRoutes from "./routes/swipes.js";
+import statsRoutes from "./routes/stats.js";
 import syncRoutes from "./routes/sync.js";
 import { runSync } from "./sync.js";
 import { registerClient } from "./ws.js";
@@ -33,7 +34,8 @@ await app.register(websocket);
  * that caches GET /api/matches looks exactly like matches that only appear after a reload.
  */
 app.addHook("onSend", async (request, reply) => {
-  if (request.raw.url?.startsWith("/api")) {
+  // Avatars are the exception: their URL carries a version, so they set their own long cache.
+  if (request.raw.url?.startsWith("/api") && !/^\/api\/users\/\d+\/avatar/.test(request.raw.url)) {
     reply.header("Cache-Control", "no-store, no-cache, must-revalidate");
     reply.header("Pragma", "no-cache");
   }
@@ -50,6 +52,7 @@ await app.register(libraryRoutes);
 await app.register(swipesRoutes);
 await app.register(matchesRoutes);
 await app.register(roundRoutes);
+await app.register(statsRoutes);
 await app.register(syncRoutes);
 
 await app.register(fastifyStatic, {

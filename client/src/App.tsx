@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type CurrentUser, type Match, type Round } from "./api";
 import Toasts, { type Toast } from "./components/Toasts";
-import { IconCards, IconHeart, IconSettings } from "./components/icons";
+import Avatar from "./components/Avatar";
+import { IconCards, IconChart, IconHeart, IconSettings } from "./components/icons";
 import { useServerEvents, type ServerEvent } from "./hooks/useServerEvents";
 import Matches from "./pages/Matches";
 import ProfileSelect from "./pages/ProfileSelect";
 import Settings from "./pages/Settings";
+import Stats from "./pages/Stats";
 import Swipe from "./pages/Swipe";
 
-type Tab = "swipe" | "matches" | "settings";
+type Tab = "swipe" | "matches" | "stats" | "settings";
 
 let toastId = 0;
 
@@ -27,6 +29,18 @@ export default function App() {
     const id = ++toastId;
     setToasts((prev) => [...prev, { id, kind, message }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5500);
+  }, []);
+
+  const loadMe = useCallback(async () => {
+    try {
+      const me = await api.me();
+      // Replace only on a real change, so the shell does not re-render on every refresh.
+      setUser((prev) =>
+        prev && prev.id === me.id && prev.displayName === me.displayName && prev.avatar === me.avatar ? prev : me
+      );
+    } catch {
+      // Signed out; the picker takes over.
+    }
   }, []);
 
   const loadRound = useCallback(async () => {
@@ -84,6 +98,8 @@ export default function App() {
         loadMatches();
       } else if (event.type === "players-changed") {
         setLibraryRefresh((n) => n + 1);
+        // A renamed profile or a new picture changes what the header shows.
+        loadMe();
       } else if (event.type === "sync-started") {
         setSyncProgress(null);
         setSyncSignal((n) => n + 1);
@@ -104,7 +120,7 @@ export default function App() {
         }
       }
     },
-    [pushToast, loadRound, loadMatches]
+    [pushToast, loadRound, loadMatches, loadMe]
   );
 
   // Refetch whenever the live connection comes back, so a match made while the phone was
@@ -112,7 +128,8 @@ export default function App() {
   const resync = useCallback(() => {
     loadRound();
     loadMatches();
-  }, [loadRound, loadMatches]);
+    loadMe();
+  }, [loadRound, loadMatches, loadMe]);
 
   const live = useServerEvents(handleServerEvent, resync);
 
@@ -173,9 +190,7 @@ export default function App() {
           Sweeple
         </h1>
         <button className="header-user" onClick={handleSignOut} aria-label={`Signed in as ${user.displayName}. Switch profile`}>
-          <span className={`avatar ${user.isAdmin ? "" : "avatar-guest"}`}>
-            {user.displayName.charAt(0).toUpperCase()}
-          </span>
+          <Avatar name={user.displayName} src={user.avatar} isAdmin={user.isAdmin} />
         </button>
       </header>
 
@@ -206,6 +221,7 @@ export default function App() {
             </div>
           </div>
         )}
+        {tab === "stats" && <Stats user={user} refreshToken={libraryRefresh} />}
         {tab === "settings" && user.isAdmin && (
           <div className="scroll-area">
             <Settings
@@ -215,6 +231,7 @@ export default function App() {
               syncProgress={syncProgress}
               onChanged={() => {
                 loadRound();
+                loadMe();
                 setLibraryRefresh((n) => n + 1);
               }}
             />
@@ -242,6 +259,10 @@ export default function App() {
             )}
           </span>
           Matches
+        </button>
+        <button className={tab === "stats" ? "tab-active" : ""} onClick={() => setTab("stats")}>
+          <IconChart />
+          Picks
         </button>
         {user.isAdmin && (
           <button className={tab === "settings" ? "tab-active" : ""} onClick={() => setTab("settings")}>

@@ -87,6 +87,7 @@ export interface CurrentUser {
   displayName: string;
   role: "core" | "guest";
   isAdmin: boolean;
+  avatar: string | null;
 }
 
 export interface Player {
@@ -94,6 +95,24 @@ export interface Player {
   username: string;
   displayName: string;
   isAdmin: boolean;
+  /** Versioned URL of the profile picture, or null when there is none. */
+  avatar: string | null;
+}
+
+export interface GameStat {
+  gameId: number;
+  name: string;
+  thumbnail: string | null;
+  likes: number;
+  total: number;
+  ratio: number;
+  byPlayer: PlayerRating[];
+}
+
+export interface Stats {
+  players: { id: number; displayName: string }[];
+  games: GameStat[];
+  summary: { games: number; votes: number; likes: number; ratio: number | null };
 }
 
 export interface Round {
@@ -173,6 +192,16 @@ export const api = {
   importLinks: () => request<ImportLinks>("/api/import/links"),
   importXml: (xml: string) =>
     request<{ kind: string; message: string }>("/api/import", { method: "POST", body: JSON.stringify({ xml }) }),
+
+  stats: (playerIds: number[]) =>
+    request<Stats>(`/api/stats${playerIds.length ? `?players=${playerIds.join(",")}` : ""}`),
+
+  setAvatar: (id: number, dataUrl: string) =>
+    request<{ ok: true; avatar: string }>(`/api/users/${id}/avatar`, {
+      method: "PUT",
+      body: JSON.stringify({ dataUrl }),
+    }),
+  removeAvatar: (id: number) => request<{ ok: true }>(`/api/users/${id}/avatar`, { method: "DELETE" }),
 
   library: () => request<{ games: LibraryGame[] }>("/api/library"),
   setGameVisibility: (id: number, mode: ExpansionMode) =>

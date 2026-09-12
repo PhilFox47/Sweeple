@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, type Player, type Round } from "../api";
 import Import from "./Import";
+import Avatar from "../components/Avatar";
+import { IconCamera } from "../components/icons";
 import ManageLibrary from "../components/ManageLibrary";
+import { toSquareDataUrl } from "../utils/image";
 import SyncControl from "../components/SyncControl";
 
 export default function Settings({
@@ -130,7 +133,8 @@ export default function Settings({
         <h3>Profiles</h3>
         <p className="panel-hint">
           Anyone who swipes needs a profile — it is how their picks are counted. Profiles stay,
-          so someone who plays again keeps their pick ratings. They can swipe but not change settings.
+          so someone who plays again keeps their pick ratings. They can swipe but not change
+          settings. Add a photo and it shows on the sign-in screen.
         </p>
         <div className="inline-form">
           <input
@@ -165,21 +169,59 @@ export default function Settings({
         <div className="list-rows">
           {players.map((p) => (
             <div className="list-row" key={p.id}>
-              <span>
+              <span className="list-row-main">
+                <Avatar name={p.displayName} src={p.avatar} isAdmin={p.isAdmin} />
                 {p.displayName} {p.isAdmin && <span className="chip-tag">admin</span>}
               </span>
-              {!p.isAdmin && (
-                <button
-                  className="btn btn-danger"
-                  disabled={busy}
-                  onClick={() => run(async () => {
-                    await api.removeProfile(p.id);
-                    return `Removed ${p.displayName}.`;
-                  })}
-                >
-                  Remove
-                </button>
-              )}
+              <span className="row-buttons">
+                {/* A hidden file input behind a label is the only way to style the picker. */}
+                <label className={`btn btn-quiet photo-button ${busy ? "is-busy" : ""}`}>
+                  <IconCamera />
+                  {p.avatar ? "Change" : "Photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={busy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      run(async () => {
+                        await api.setAvatar(p.id, await toSquareDataUrl(file));
+                        return `Updated ${p.displayName}'s picture.`;
+                      });
+                    }}
+                  />
+                </label>
+                {p.avatar && (
+                  <button
+                    className="btn btn-quiet"
+                    disabled={busy}
+                    onClick={() =>
+                      run(async () => {
+                        await api.removeAvatar(p.id);
+                        return `Removed ${p.displayName}'s picture.`;
+                      })
+                    }
+                  >
+                    Clear
+                  </button>
+                )}
+                {!p.isAdmin && (
+                  <button
+                    className="btn btn-danger"
+                    disabled={busy}
+                    onClick={() =>
+                      run(async () => {
+                        await api.removeProfile(p.id);
+                        return `Removed ${p.displayName}.`;
+                      })
+                    }
+                  >
+                    Remove
+                  </button>
+                )}
+              </span>
             </div>
           ))}
         </div>

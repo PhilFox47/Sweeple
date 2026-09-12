@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type CurrentUser, type Player } from "../api";
+import Avatar from "../components/Avatar";
 
 export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: CurrentUser) => void }) {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -30,9 +31,7 @@ export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: Curre
   function card(p: Player) {
     return (
       <button key={p.id} className="profile-card" onClick={() => pick(p)} disabled={busy}>
-        <span className={`avatar ${p.isAdmin ? "" : "avatar-guest"}`}>
-          {p.displayName.charAt(0).toUpperCase()}
-        </span>
+        <Avatar name={p.displayName} src={p.avatar} isAdmin={p.isAdmin} />
         {p.displayName}
       </button>
     );
@@ -50,7 +49,7 @@ export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: Curre
 
       {guests.length > 0 && (
         <>
-          <div className="profile-label">Guests</div>
+          <div className="profile-label">Other profiles</div>
           <div className="profile-grid">{guests.map(card)}</div>
         </>
       )}
