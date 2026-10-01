@@ -14,6 +14,8 @@ services:
       NANOGPT_API_KEY: ${NANOGPT_API_KEY:-}
       NANOGPT_MODEL: ${NANOGPT_MODEL:-}
       NANOGPT_BASE_URL: ${NANOGPT_BASE_URL:-https://nano-gpt.com/api/v1}
+      NANOGPT_BATCH_SIZE: ${NANOGPT_BATCH_SIZE:-10}
+      NANOGPT_BATCH_PAUSE_MS: ${NANOGPT_BATCH_PAUSE_MS:-5000}
     volumes:
       - sweeple-data:/data
 

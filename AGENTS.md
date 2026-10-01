@@ -79,6 +79,8 @@ stores the English it came from in `summary_from` and is redone when BGG's text 
 `'manual'` summary is never overwritten, not even by "re-translate all", which always starts
 again from BGG's English. The model is picked in Settings and stored in the `settings` table,
 overriding `NANOGPT_MODEL`; `summary_model` records which model made each translation.
+Requests go out in batches (10, then a 5 s pause) because a steady stream earns 429s; a 429
+shrinks the batch to what got through and waits per `Retry-After` instead of ending the run.
 `NANOGPT_API_KEY`, like `BGG_TOKEN`, lives only in `.env`. To test without spending, point `NANOGPT_BASE_URL` and `BGG_JSON_ORIGIN` at local mocks.
 
 **A collection response calls everything a `boardgame`.** Only `/thing` marks expansions. Skip

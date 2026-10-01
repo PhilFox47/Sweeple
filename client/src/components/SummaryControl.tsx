@@ -100,6 +100,8 @@ export default function SummaryControl({ refreshToken }: { refreshToken: number 
             <p className="panel-hint">
               {status.retranslating ? "Übersetze alles neu" : "Übersetze"} mit {status.model}… {status.done} von{" "}
               {status.runTotal}
+              {status.rateLimitedFor !== null &&
+                ` · Nano-GPT bremst, weiter in ${status.rateLimitedFor} s`}
             </p>
           ) : (
             status.model && (

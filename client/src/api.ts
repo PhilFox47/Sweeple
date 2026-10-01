@@ -79,6 +79,8 @@ export interface TranslationStatus {
   withoutText: number;
   done: number;
   runTotal: number;
+  /** Seconds left in a pause Nano-GPT asked for, or null. */
+  rateLimitedFor: number | null;
   lastError: string | null;
 }
 
