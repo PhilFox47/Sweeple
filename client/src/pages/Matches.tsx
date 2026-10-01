@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type Match } from "../api";
+import { api, type Match, type MatchThreshold } from "../api";
 import { IconSparkle } from "../components/icons";
 
 function meta(match: Match): string {
@@ -12,14 +12,36 @@ function meta(match: Match): string {
   return bits.join(" · ");
 }
 
-export default function Matches({ matches, onChanged }: { matches: Match[]; onChanged: () => void }) {
+/** One line on what a match takes right now, shown only once there are enough players for it to vary. */
+function thresholdNote(threshold: MatchThreshold | null): string | null {
+  if (!threshold || threshold.players < 3) return null;
+  if (threshold.required < threshold.players) {
+    return `Soft matches count now: ${threshold.required} of ${threshold.players} likes is enough.`;
+  }
+  return `Everyone has to agree for now. Once a third player is three quarters through their deck, ${
+    threshold.players - 1
+  } of ${threshold.players} will do.`;
+}
+
+export default function Matches({
+  matches,
+  threshold,
+  onChanged,
+}: {
+  matches: Match[];
+  threshold: MatchThreshold | null;
+  onChanged: () => void;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [chosenId, setChosenId] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const pending = matches.filter((m) => !m.playedAt);
+  const full = pending.filter((m) => m.kind === "full");
+  const soft = pending.filter((m) => m.kind === "soft");
   const played = matches.filter((m) => m.playedAt);
+  const note = thresholdNote(threshold);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -39,10 +61,13 @@ export default function Matches({ matches, onChanged }: { matches: Match[]; onCh
 
   /** Flickers through the candidates before settling, so the pick reads as a draw. */
   function chooseForMe() {
-    if (pending.length === 0 || rolling) return;
-    const winner = pending[Math.floor(Math.random() * pending.length)];
+    // A game everybody wanted beats one most people did, so soft matches are only drawn from
+    // when there is no full one.
+    const pool = full.length > 0 ? full : soft;
+    if (pool.length === 0 || rolling) return;
+    const winner = pool[Math.floor(Math.random() * pool.length)];
 
-    if (pending.length === 1) {
+    if (pool.length === 1) {
       setChosenId(winner.id);
       return;
     }
@@ -55,7 +80,7 @@ export default function Matches({ matches, onChanged }: { matches: Match[]; onCh
     for (let i = 0; i < steps; i++) {
       timers.current.push(
         setTimeout(() => {
-          setChosenId(pending[Math.floor(Math.random() * pending.length)].id);
+          setChosenId(pool[Math.floor(Math.random() * pool.length)].id);
         }, i * 70)
       );
     }
@@ -65,6 +90,40 @@ export default function Matches({ matches, onChanged }: { matches: Match[]; onCh
         setRolling(false);
         document.getElementById(`match-${winner.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, steps * 70)
+    );
+  }
+
+  function card(match: Match) {
+    return (
+      <div
+        id={`match-${match.id}`}
+        className={`match-card ${match.kind === "soft" ? "is-soft" : ""} ${chosenId === match.id ? "is-chosen" : ""}`}
+        key={match.id}
+      >
+        {match.thumbnail ? <img src={match.thumbnail} alt="" loading="lazy" /> : <img alt="" />}
+        <div className="match-info">
+          <h3>{match.name}</h3>
+          <div className="match-meta">
+            {chosenId === match.id && !rolling ? (
+              <span className="pick-note">
+                <IconSparkle /> Tonight's pick
+              </span>
+            ) : (
+              <>
+                {match.kind === "soft" && threshold && (
+                  <span className="soft-tag">
+                    {match.likes} of {threshold.players}
+                  </span>
+                )}
+                {meta(match)}
+              </>
+            )}
+          </div>
+        </div>
+        <button className="btn btn-primary" onClick={() => markPlayed(match.id)}>
+          Played
+        </button>
+      </div>
     );
   }
 
@@ -84,6 +143,8 @@ export default function Matches({ matches, onChanged }: { matches: Match[]; onCh
         )}
       </div>
 
+      {note && <p className="threshold-note">{note}</p>}
+
       {pending.length === 0 ? (
         <div className="empty-state">
           <div className="empty-emoji">🤝</div>
@@ -91,30 +152,16 @@ export default function Matches({ matches, onChanged }: { matches: Match[]; onCh
           <p>When everyone swipes right on the same game it lands here.</p>
         </div>
       ) : (
-        pending.map((match) => (
-          <div
-            id={`match-${match.id}`}
-            className={`match-card ${chosenId === match.id ? "is-chosen" : ""}`}
-            key={match.id}
-          >
-            {match.thumbnail ? <img src={match.thumbnail} alt="" loading="lazy" /> : <img alt="" />}
-            <div className="match-info">
-              <h3>{match.name}</h3>
-              <div className="match-meta">
-                {chosenId === match.id && !rolling ? (
-                  <span className="pick-note">
-                    <IconSparkle /> Tonight's pick
-                  </span>
-                ) : (
-                  meta(match)
-                )}
-              </div>
-            </div>
-            <button className="btn btn-primary" onClick={() => markPlayed(match.id)}>
-              Played
-            </button>
-          </div>
-        ))
+        <>
+          {full.map((match) => card(match))}
+          {soft.length > 0 && (
+            <>
+              <div className="section-heading soft-heading">Soft matches · {soft.length}</div>
+              <p className="threshold-note">Most of you liked these, not everyone.</p>
+              {soft.map((match) => card(match))}
+            </>
+          )}
+        </>
       )}
 
       {played.length > 0 && (

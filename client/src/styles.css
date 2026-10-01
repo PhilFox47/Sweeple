@@ -1658,6 +1658,32 @@ code {
     transform 0.18s var(--ease);
 }
 
+/* Soft matches: liked by most of the table, not all of it. Present, but quieter. */
+.match-card.is-soft {
+  border-style: dashed;
+}
+
+.soft-heading {
+  margin-top: 1.2rem;
+}
+
+.soft-tag {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #c7c0ff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.threshold-note {
+  margin: 0 0 0.7rem;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
 .pick-note {
   display: inline-flex;
   align-items: center;

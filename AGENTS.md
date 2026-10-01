@@ -94,6 +94,13 @@ exception: their URL carries a version, so they cache forever.
 weights, and the weighted sampling. The client renders whatever order it is given and re-fetches
 after each swipe; it does not re-order anything.
 
+**Match rules live in `server/src/matching.ts`**, full and soft alike. `reconcileMatches()`
+re-evaluates every liked game in the round, not just the one swiped, because lowering the bar can
+turn several games into matches at once — call it after anything that changes likes or anyone's
+progress. Progress is swipes over the deck size recorded at the player's last deck fetch, so a
+player who never fetches a deck never counts as nearly done. Do not delete swipes mid-round
+(marking a match played used to): it silently knocks progress back and withdraws soft matches.
+
 **`react-tinder-card` props must be referentially stable.** An inline array or a fresh callback
 makes its `useLayoutEffect` reinstall listeners mid-gesture, which resets the drag origin and
 snaps the card back to the centre. `DeckCard` is memoised and takes module-level constants for

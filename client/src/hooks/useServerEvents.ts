@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
 export type ServerEvent =
-  | { type: "match"; gameId: number; gameName: string; thumbnail: string | null }
+  | {
+      type: "match";
+      gameId: number;
+      gameName: string;
+      thumbnail: string | null;
+      kind: "full" | "soft";
+      likes: number;
+      players: number;
+    }
   | { type: "sync-started" }
   | { type: "sync-progress"; message: string }
   | { type: "library-changed" }

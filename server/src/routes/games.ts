@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { authenticate } from "../auth.js";
 import { OPENING_CARDS, openingHands, weightFor, weightedOrder, type Candidate } from "../deck.js";
+import { reconcileMatches, recordDeckTotal } from "../matching.js";
 import { activeRoundId, getActiveRound } from "../rounds.js";
 import { ratingsForUser } from "../stats.js";
 
@@ -194,6 +195,10 @@ export default async function gamesRoutes(app: FastifyInstance) {
     const position = (
       db.prepare("SELECT COUNT(*) AS n FROM swipes WHERE user_id = ?").get(userId) as { n: number }
     ).n;
+
+    // How far through their deck a player is decides soft matches, and only this request knows
+    // how big their deck is under their own filters. A change can move the bar for everyone.
+    if (recordDeckTotal(userId, position, rows.length)) reconcileMatches();
 
     const candidates = new Map<number, Candidate>(
       rows.map((row) => [

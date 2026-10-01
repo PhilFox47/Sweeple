@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type CurrentUser, type Match, type Round } from "./api";
+import { api, type CurrentUser, type Match, type MatchKind, type MatchThreshold, type Round } from "./api";
 import Toasts, { type Toast } from "./components/Toasts";
 import Avatar from "./components/Avatar";
 import { IconCards, IconChart, IconHeart, IconSettings } from "./components/icons";
@@ -21,13 +21,15 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("swipe");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [threshold, setThreshold] = useState<MatchThreshold | null>(null);
   const [libraryRefresh, setLibraryRefresh] = useState(0);
   const [syncSignal, setSyncSignal] = useState(0);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
-  // Every match we have already told this user about, so polling can tell a new one apart from
-  // one that was on screen a moment ago. Null until the first load, which never announces.
-  const announced = useRef<Set<number> | null>(null);
+  // Every match we have already told this user about, and as what, so polling can tell a new one
+  // — or a soft one everybody has now come round to — from one that was on screen a moment ago.
+  // Null until the first load, which never announces.
+  const announced = useRef<Map<number, MatchKind> | null>(null);
 
   const pushToast = useCallback((kind: Toast["kind"], message: string) => {
     const id = ++toastId;
@@ -74,17 +76,33 @@ export default function App() {
   // Held here rather than in the Matches page so the tab badge and the list agree.
   const loadMatches = useCallback(async () => {
     try {
-      const { matches: next } = await api.matches();
+      const { matches: next, threshold: bar } = await api.matches();
       setMatches(next);
+      setThreshold(bar);
 
       const pending = next.filter((m) => !m.playedAt);
       const seen = announced.current;
       if (seen) {
-        for (const m of pending) {
-          if (!seen.has(m.id)) pushToast("match", `It's a match — "${m.name}" 🎉`);
+        // New matches, and soft ones that have since become full. A full one slipping back to soft
+        // when somebody starts over is not news.
+        const news = pending.filter((m) => {
+          const before = seen.get(m.id);
+          return before === undefined || (before === "soft" && m.kind === "full");
+        });
+        // Lowering the bar can make several games soft matches in one go. One toast, not five.
+        if (news.length > 2) {
+          pushToast("match", `${news.length} new matches — have a look 🎉`);
+        } else {
+          for (const m of news) {
+            if (m.kind === "full") {
+              pushToast("match", seen.has(m.id) ? `Everyone's in on "${m.name}" now 🎉` : `It's a match — "${m.name}" 🎉`);
+            } else {
+              pushToast("match", `Soft match — ${m.likes} of ${bar.players} liked "${m.name}"`);
+            }
+          }
         }
       }
-      announced.current = new Set(pending.map((m) => m.id));
+      announced.current = new Map(pending.map((m) => [m.id, m.kind]));
     } catch {
       // Not signed in yet.
     }
@@ -226,7 +244,7 @@ export default function App() {
         {tab === "swipe" && <Swipe refreshToken={libraryRefresh} round={round} />}
         {tab === "matches" && (
           <div className="scroll-area">
-            <Matches matches={matches} onChanged={loadMatches} />
+            <Matches matches={matches} threshold={threshold} onChanged={loadMatches} />
             <div className="bgg-credit">
               <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
                 Powered by BGG

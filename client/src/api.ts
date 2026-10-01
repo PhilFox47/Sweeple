@@ -57,10 +57,16 @@ export interface LibraryGame {
   rating: GameRating;
 }
 
+export type MatchKind = "full" | "soft";
+
 export interface Match {
   id: number;
   createdAt: string;
   playedAt: string | null;
+  /** "full": everyone in the round liked it. "soft": enough did, once the round dragged on. */
+  kind: MatchKind;
+  /** How many of the round's players liked it. */
+  likes: number;
   gameId: number;
   name: string;
   thumbnail: string | null;
@@ -69,6 +75,14 @@ export interface Match {
   maxPlayers: number | null;
   playingTime: number | null;
   weight: number | null;
+}
+
+/** What a match takes right now: `required` likes out of `players`. */
+export interface MatchThreshold {
+  players: number;
+  required: number;
+  /** Players at least 75% of the way through their deck. */
+  nearlyDone: number;
 }
 
 export interface ImportLinks {
@@ -186,7 +200,7 @@ export const api = {
     request<{ ok: true }>("/api/swipes", { method: "POST", body: JSON.stringify({ gameId, decision }) }),
   resetSwipes: () => request<{ ok: true }>("/api/swipes/reset", { method: "POST" }),
 
-  matches: () => request<{ matches: Match[] }>("/api/matches"),
+  matches: () => request<{ matches: Match[]; threshold: MatchThreshold }>("/api/matches"),
   markPlayed: (matchId: number) => request<{ ok: true }>(`/api/matches/${matchId}/played`, { method: "POST" }),
 
   importLinks: () => request<ImportLinks>("/api/import/links"),

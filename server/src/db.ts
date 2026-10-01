@@ -84,6 +84,10 @@ if (matchesAreUniquePerGameOnly()) {
   console.log("[db] migrated: matches are now unique per game per round");
 }
 
+// Soft matches. Added after the rebuild above, which only carries the columns it knows about.
+addColumnIfMissing("matches", "kind", "TEXT NOT NULL DEFAULT 'full'");
+addColumnIfMissing("matches", "likes", "INTEGER NOT NULL DEFAULT 0");
+
 // Profile pictures live in the database rather than on disk: they are a few tens of kilobytes
 // each for a handful of profiles, and this way a backup of the database is the whole app.
 addColumnIfMissing("users", "avatar", "BLOB");

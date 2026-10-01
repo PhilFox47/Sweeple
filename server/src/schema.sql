@@ -73,7 +73,21 @@ CREATE TABLE IF NOT EXISTS matches (
   round_id INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   played_at TEXT,
+  -- 'full' when everyone in the round liked it; 'soft' when enough did once the round dragged on.
+  kind TEXT NOT NULL DEFAULT 'full',
+  -- How many of the round's players had liked it when the match was last re-evaluated.
+  likes INTEGER NOT NULL DEFAULT 0,
   UNIQUE(game_id, round_id)
+);
+
+-- How big each player's deck was, under their own filters, the last time they fetched it.
+-- Progress through a round is swipes made over this, which is what decides soft matches.
+CREATE TABLE IF NOT EXISTS round_progress (
+  round_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  deck_total INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (round_id, user_id)
 );
 
 -- A swipe round is one sitting: a fixed set of players deciding on a game together.
