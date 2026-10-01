@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS games (
   -- 'ai': machine-translated from summary_from. 'manual': written by hand, never replaced.
   summary_source TEXT CHECK (summary_source IN ('ai', 'manual')),
   summary_from TEXT,
+  -- Which Nano-GPT model made the translation, so models can be compared.
+  summary_model TEXT,
   owned INTEGER NOT NULL DEFAULT 1,
   last_synced_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -114,4 +116,11 @@ CREATE TABLE IF NOT EXISTS sync_log (
   games_added INTEGER NOT NULL DEFAULT 0,
   games_updated INTEGER NOT NULL DEFAULT 0,
   error TEXT
+);
+
+-- Settings changed from the web UI rather than .env, such as the translation model.
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

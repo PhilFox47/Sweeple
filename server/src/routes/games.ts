@@ -7,7 +7,14 @@ import { reconcileMatches, recordDeckTotal } from "../matching.js";
 import { activeRoundId, getActiveRound } from "../rounds.js";
 import { ratingsForUser } from "../stats.js";
 import { displayBlurb } from "../blurbs.js";
-import { setManualSummary, translateMissing, translationStatus } from "../translate.js";
+import {
+  listModels,
+  sampleTranslations,
+  setManualSummary,
+  setModel,
+  translateMissing,
+  translationStatus,
+} from "../translate.js";
 
 interface GameRow {
   id: number;
@@ -253,15 +260,57 @@ export default async function gamesRoutes(app: FastifyInstance) {
 
   app.get("/api/summaries", { preHandler: [authenticate, requireAdmin] }, async () => translationStatus());
 
-  app.post("/api/summaries/translate", { preHandler: [authenticate, requireAdmin] }, async (_request, reply) => {
-    const status = translationStatus();
-    if (!status.configured) {
-      return reply.code(400).send({ error: `Für Übersetzungen fehlt in der .env: ${status.missing.join(", ")}.` });
+  app.post<{ Body: { all?: boolean } }>(
+    "/api/summaries/translate",
+    { preHandler: [authenticate, requireAdmin] },
+    async (request, reply) => {
+      const status = translationStatus();
+      if (status.missing.includes("NANOGPT_API_KEY")) {
+        return reply.code(400).send({ error: "Für Übersetzungen fehlt NANOGPT_API_KEY in der .env." });
+      }
+      if (status.missing.includes("model")) return reply.code(400).send({ error: "Zuerst ein Modell auswählen." });
+      if (status.running) return reply.code(409).send({ error: "Es wird gerade schon übersetzt." });
+      // Runs in the background; Settings polls the status while it does.
+      void translateMissing({ all: request.body?.all === true });
+      return { ...translationStatus(), running: true, retranslating: request.body?.all === true };
     }
-    // Runs in the background; Settings polls the status while it does.
-    void translateMissing();
-    return { ...translationStatus(), running: true };
+  );
+
+  app.get("/api/summaries/models", { preHandler: [authenticate, requireAdmin] }, async (_request, reply) => {
+    try {
+      return { models: await listModels() };
+    } catch (err) {
+      // Not fatal for Settings: a model ID can still be typed in by hand.
+      return reply.code(502).send({ error: err instanceof Error ? err.message : "Modellliste nicht erreichbar." });
+    }
   });
+
+  app.put<{ Body: { model: string | null } }>(
+    "/api/summaries/model",
+    { preHandler: [authenticate, requireAdmin] },
+    async (request, reply) => {
+      const model = request.body?.model;
+      if (model !== null && (typeof model !== "string" || model.trim().length === 0 || model.length > 200)) {
+        return reply.code(400).send({ error: "Das ist keine gültige Modell-ID." });
+      }
+      setModel(model);
+      return translationStatus();
+    }
+  );
+
+  app.post<{ Body: { model: string } }>(
+    "/api/summaries/sample",
+    { preHandler: [authenticate, requireAdmin] },
+    async (request, reply) => {
+      const model = request.body?.model?.trim();
+      if (!model) return reply.code(400).send({ error: "Welches Modell soll es probieren?" });
+      try {
+        return { model, samples: await sampleTranslations(model) };
+      } catch (err) {
+        return reply.code(502).send({ error: err instanceof Error ? err.message : "Probe fehlgeschlagen." });
+      }
+    }
+  );
 
   app.put<{ Params: { id: string }; Body: { summary: string | null } }>(
     "/api/games/:id/summary",

@@ -76,8 +76,10 @@ request per game, so `short_checked_at` keeps a sync from asking twice. With non
 falls back to the opening of the XML `description` (`server/src/blurbs.ts` decides). Nano-GPT
 only *translates* (`server/src/translate.ts`, OpenAI-style chat completions); each translation
 stores the English it came from in `summary_from` and is redone when BGG's text changes. A
-`'manual'` summary is never overwritten. `NANOGPT_API_KEY`, like `BGG_TOKEN`, lives only in
-`.env`. To test without spending, point `NANOGPT_BASE_URL` and `BGG_JSON_ORIGIN` at local mocks.
+`'manual'` summary is never overwritten, not even by "re-translate all", which always starts
+again from BGG's English. The model is picked in Settings and stored in the `settings` table,
+overriding `NANOGPT_MODEL`; `summary_model` records which model made each translation.
+`NANOGPT_API_KEY`, like `BGG_TOKEN`, lives only in `.env`. To test without spending, point `NANOGPT_BASE_URL` and `BGG_JSON_ORIGIN` at local mocks.
 
 **A collection response calls everything a `boardgame`.** Only `/thing` marks expansions. Skip
 the detail step and expansions land in the swipe deck as standalone games.

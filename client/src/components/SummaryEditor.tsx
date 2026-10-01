@@ -27,7 +27,7 @@ export default function SummaryEditor({ game, onSaved }: { game: LibraryGame; on
     game.summarySource === "manual"
       ? "Von Hand geschrieben"
       : game.summaryLanguage === "de"
-        ? "Von Nano-GPT übersetzt"
+        ? `Übersetzt${game.summaryModel ? ` mit ${game.summaryModel}` : ""}`
         : game.english
           ? "Noch englisch"
           : "BGG hat keinen Text für dieses Spiel";

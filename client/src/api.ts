@@ -64,18 +64,34 @@ export interface LibraryGame {
   summaryLanguage: "de" | "en" | null;
   /** "ai" when translated, "manual" when written by hand — a hand-written one is never replaced. */
   summarySource: "ai" | "manual" | null;
+  /** The Nano-GPT model behind the German shown, when it is a translation. */
+  summaryModel: string | null;
 }
 
 export interface TranslationStatus {
   configured: boolean;
-  missing: ("NANOGPT_API_KEY" | "NANOGPT_MODEL")[];
+  missing: ("NANOGPT_API_KEY" | "model")[];
   model: string | null;
   running: boolean;
+  retranslating: boolean;
   withText: number;
   inGerman: number;
   withoutText: number;
   done: number;
+  runTotal: number;
   lastError: string | null;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string | null;
+}
+
+export interface Sample {
+  name: string;
+  english: string;
+  current: string | null;
+  candidate: string | null;
 }
 
 export type MatchKind = "full" | "soft";
@@ -242,7 +258,13 @@ export const api = {
   removeAvatar: (id: number) => request<{ ok: true }>(`/api/users/${id}/avatar`, { method: "DELETE" }),
 
   translationStatus: () => request<TranslationStatus>("/api/summaries"),
-  translateSummaries: () => request<TranslationStatus>("/api/summaries/translate", { method: "POST" }),
+  translateSummaries: (all = false) =>
+    request<TranslationStatus>("/api/summaries/translate", { method: "POST", body: JSON.stringify({ all }) }),
+  translationModels: () => request<{ models: ModelInfo[] }>("/api/summaries/models"),
+  setTranslationModel: (model: string | null) =>
+    request<TranslationStatus>("/api/summaries/model", { method: "PUT", body: JSON.stringify({ model }) }),
+  sampleTranslations: (model: string) =>
+    request<{ model: string; samples: Sample[] }>("/api/summaries/sample", { method: "POST", body: JSON.stringify({ model }) }),
   setSummary: (gameId: number, summary: string | null) =>
     request<{ ok: true }>(`/api/games/${gameId}/summary`, { method: "PUT", body: JSON.stringify({ summary }) }),
 

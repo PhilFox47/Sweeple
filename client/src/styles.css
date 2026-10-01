@@ -1243,6 +1243,129 @@ button.library-meta {
   gap: 0.5rem;
 }
 
+/* ---------------------------------------------------------------- models */
+
+.model-picker {
+  margin: 0.4rem 0 0.2rem;
+}
+
+.model-current {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+}
+
+.model-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.model-id {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+.model-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.model-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.model-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.model-option:last-child {
+  border-bottom: none;
+}
+
+.model-option.is-current {
+  background: var(--accent-soft);
+}
+
+.model-option-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.model-option-name {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.samples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.sample {
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.sample-name {
+  font-weight: 600;
+  font-size: 0.86rem;
+  margin-bottom: 0.3rem;
+}
+
+.sample-line {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.sample-en {
+  color: var(--text-dim);
+}
+
+.sample-new {
+  color: var(--text);
+}
+
+.sample-label {
+  display: inline-block;
+  min-width: 3.4rem;
+  margin-right: 0.3rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
+.sample-new .sample-label {
+  color: var(--accent);
+}
+
 .summary-original {
   margin: 0;
   font-size: 0.8rem;

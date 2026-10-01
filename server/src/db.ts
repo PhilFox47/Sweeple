@@ -103,6 +103,8 @@ if (addColumnIfMissing("games", "summary_from", "TEXT")) {
   if (dropped > 0) console.log(`[db] migrated: dropped ${dropped} generated summaries, BGG's text replaces them`);
 }
 
+addColumnIfMissing("games", "summary_model", "TEXT");
+
 // Soft matches. Added after the rebuild above, which only carries the columns it knows about.
 addColumnIfMissing("matches", "kind", "TEXT NOT NULL DEFAULT 'full'");
 addColumnIfMissing("matches", "likes", "INTEGER NOT NULL DEFAULT 0");
@@ -130,6 +132,20 @@ if (voteCount === 0) {
     )
     .run(round?.id ?? 0).changes;
   if (copied > 0) console.log(`[db] migrated: seeded ${copied} pick ratings from the current round`);
+}
+
+export function getSetting(key: string): string | null {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setSetting(key: string, value: string | null): void {
+  if (value === null) db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+  else
+    db.prepare(
+      `INSERT INTO settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+    ).run(key, value);
 }
 
 export function hashPassword(password: string): string {

@@ -19,6 +19,7 @@ interface Row {
   summary: string | null;
   summary_source: string | null;
   summary_from: string | null;
+  summary_model: string | null;
   short_description: string | null;
   description: string | null;
 }
@@ -98,7 +99,7 @@ export default async function libraryRoutes(app: FastifyInstance) {
     const rows = db
       .prepare(
         `SELECT id, name, thumbnail, min_players, max_players, is_expansion, expansion_mode,
-                summary, summary_source, summary_from, short_description, description
+                summary, summary_source, summary_from, summary_model, short_description, description
          FROM games
          WHERE owned = 1
          ORDER BY name COLLATE NOCASE`
@@ -124,6 +125,7 @@ export default async function libraryRoutes(app: FastifyInstance) {
         summary: displayBlurb(r).text,
         summaryLanguage: displayBlurb(r).language,
         summarySource: r.summary_source as "ai" | "manual" | null,
+        summaryModel: displayBlurb(r).language === "de" && r.summary_source === "ai" ? r.summary_model : null,
         // What the deck does with it today, once the override is applied.
         hidden: r.expansion_mode === "hidden" || (r.expansion_mode === "auto" && !!r.is_expansion),
       })),
