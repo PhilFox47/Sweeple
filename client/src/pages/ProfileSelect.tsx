@@ -11,7 +11,7 @@ export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: Curre
     api
       .listUsers()
       .then((r) => setPlayers(r.users))
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load profiles"));
+      .catch((err) => setError(err instanceof Error ? err.message : "Profile konnten nicht geladen werden"));
   }, []);
 
   async function pick(player: Player) {
@@ -20,7 +20,7 @@ export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: Curre
     try {
       onSignedIn(await api.login(player.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sign in");
+      setError(err instanceof Error ? err.message : "Anmeldung fehlgeschlagen");
       setBusy(false);
     }
   }
@@ -42,14 +42,14 @@ export default function ProfileSelect({ onSignedIn }: { onSignedIn: (user: Curre
       <div className="profile-hero">
         <div className="brand-mark">🎲</div>
         <h1>Sweeple</h1>
-        <p>Who's playing tonight?</p>
+        <p>Wer spielt heute?</p>
       </div>
 
       <div className="profile-grid">{admins.map(card)}</div>
 
       {guests.length > 0 && (
         <>
-          <div className="profile-label">Other profiles</div>
+          <div className="profile-label">Weitere Profile</div>
           <div className="profile-grid">{guests.map(card)}</div>
         </>
       )}

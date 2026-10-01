@@ -63,12 +63,12 @@ export function clearRoundProgress(): { swipes: number; matches: number } {
 
 export function startRound(playerIds: number[]): Round {
   const unique = [...new Set(playerIds)];
-  if (unique.length === 0) throw new Error("Pick at least one player for the round.");
+  if (unique.length === 0) throw new Error("Wähle mindestens eine Person für die Runde.");
 
   const known = db
     .prepare(`SELECT id FROM users WHERE id IN (${unique.map(() => "?").join(",")})`)
     .all(...unique) as { id: number }[];
-  if (known.length !== unique.length) throw new Error("One of those players no longer exists.");
+  if (known.length !== unique.length) throw new Error("Eines dieser Profile gibt es nicht mehr.");
 
   db.transaction(() => {
     db.prepare("UPDATE rounds SET ended_at = datetime('now') WHERE ended_at IS NULL").run();

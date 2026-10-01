@@ -3,6 +3,7 @@ import { authenticate, requireAdmin } from "../auth.js";
 import { collectionUrl, configuredToken, parseCollectionXml, parsePlaysXml, parseThingXml, thingUrl } from "../bgg.js";
 import { applyCollection, applyDetails, applyPlays, gamesMissingDetails } from "../store.js";
 import { db } from "../db.js";
+import { generateMissingSummaries } from "../summaries.js";
 import { broadcast } from "../ws.js";
 
 const DETAIL_CHUNK = 20;
@@ -43,7 +44,7 @@ export default async function importRoutes(app: FastifyInstance) {
 
   app.post<{ Body: { xml: string } }>("/api/import", { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
     const xml = request.body?.xml?.trim();
-    if (!xml) return reply.code(400).send({ error: "Paste the BGG response first." });
+    if (!xml) return reply.code(400).send({ error: "Zuerst die Antwort von BGG einfügen." });
 
     const kind = detectKind(xml);
     if (!kind) {
@@ -59,16 +60,16 @@ export default async function importRoutes(app: FastifyInstance) {
         if (items.length === 0) {
           return reply.code(400).send({
             error:
-              "That collection response contains no games. If it says the request is being processed, " +
-              "reload the BGG page a few seconds later and paste the result.",
+              "Diese Sammlung enthält keine Spiele. Falls dort steht, dass die Anfrage bearbeitet wird, " +
+              "die BGG-Seite nach ein paar Sekunden neu laden und das Ergebnis einfügen.",
           });
         }
         const result = applyCollection(items);
         broadcast({ type: "library-changed" });
         return {
           kind,
-          message: `Imported ${items.length} games (${result.added} new, ${result.updated} updated${
-            result.markedUnowned ? `, ${result.markedUnowned} no longer owned` : ""
+          message: `${items.length} Spiele importiert (${result.added} neu, ${result.updated} aktualisiert${
+            result.markedUnowned ? `, ${result.markedUnowned} nicht mehr im Besitz` : ""
           }).`,
           ...result,
         };
@@ -76,16 +77,18 @@ export default async function importRoutes(app: FastifyInstance) {
 
       if (kind === "thing") {
         const details = parseThingXml(xml);
-        if (details.length === 0) return reply.code(400).send({ error: "No games found in that response." });
+        if (details.length === 0) return reply.code(400).send({ error: "In dieser Antwort sind keine Spiele." });
         const result = applyDetails(details);
         broadcast({ type: "library-changed" });
+        // Details are what a summary is written from, so this is when one becomes possible.
+        void generateMissingSummaries();
         const expansions = details.filter((d) => d.isExpansion).length;
         return {
           kind,
           message:
-            `Updated details for ${result.updated} games` +
-            (expansions ? `, ${expansions} identified as expansions` : "") +
-            (result.unknown ? `. ${result.unknown} were not in your library — import the collection first.` : "."),
+            `Details für ${result.updated} Spiele aktualisiert` +
+            (expansions ? `, ${expansions} davon Erweiterungen` : "") +
+            (result.unknown ? `. ${result.unknown} sind nicht in der Bibliothek — zuerst die Sammlung importieren.` : "."),
           ...result,
         };
       }
@@ -95,11 +98,11 @@ export default async function importRoutes(app: FastifyInstance) {
       broadcast({ type: "library-changed" });
       return {
         kind,
-        message: `Updated play history for ${result.updated} games from ${plays.size} entries.`,
+        message: `Partien für ${result.updated} Spiele aus ${plays.size} Einträgen aktualisiert.`,
         ...result,
       };
     } catch (err) {
-      return reply.code(400).send({ error: err instanceof Error ? err.message : "Could not parse that response." });
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "Diese Antwort konnte nicht gelesen werden." });
     }
   });
 }

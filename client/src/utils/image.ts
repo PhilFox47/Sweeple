@@ -16,7 +16,7 @@ export async function toSquareDataUrl(file: File): Promise<string> {
     canvas.width = SIZE;
     canvas.height = SIZE;
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Could not read that image.");
+    if (!ctx) throw new Error("Das Bild konnte nicht gelesen werden.");
     ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, SIZE, SIZE);
 
     return canvas.toDataURL("image/jpeg", 0.85);

@@ -17,7 +17,7 @@ export default async function statsRoutes(app: FastifyInstance) {
 
     const playerIds = asked.length > 0 ? [...new Set(asked)] : [me.id];
     if (me.role !== "core" && playerIds.some((id) => id !== me.id)) {
-      return reply.code(403).send({ error: "You can only see your own picks." });
+      return reply.code(403).send({ error: "Du kannst nur deine eigene Statistik sehen." });
     }
 
     const games = statsForPlayers(playerIds);

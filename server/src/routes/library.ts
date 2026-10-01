@@ -15,6 +15,8 @@ interface Row {
   max_players: number | null;
   is_expansion: number;
   expansion_mode: string;
+  summary: string | null;
+  summary_source: string | null;
 }
 
 /** Words used for matching: lower case, punctuation flattened. */
@@ -91,7 +93,8 @@ export default async function libraryRoutes(app: FastifyInstance) {
   app.get("/api/library", { preHandler: [authenticate, requireAdmin] }, async () => {
     const rows = db
       .prepare(
-        `SELECT id, name, thumbnail, min_players, max_players, is_expansion, expansion_mode
+        `SELECT id, name, thumbnail, min_players, max_players, is_expansion, expansion_mode,
+                summary, summary_source
          FROM games
          WHERE owned = 1
          ORDER BY name COLLATE NOCASE`
@@ -112,6 +115,8 @@ export default async function libraryRoutes(app: FastifyInstance) {
         mode: (r.expansion_mode ?? "auto") as Mode,
         series: series.get(r.id) ?? null,
         rating: ratings.get(r.id) ?? EMPTY_RATING,
+        summary: r.summary,
+        summarySource: r.summary_source as "ai" | "manual" | null,
         // What the deck does with it today, once the override is applied.
         hidden: r.expansion_mode === "hidden" || (r.expansion_mode === "auto" && !!r.is_expansion),
       })),
@@ -128,7 +133,7 @@ export default async function libraryRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: `mode must be one of ${MODES.join(", ")}` });
       }
       const changed = db.prepare("UPDATE games SET expansion_mode = ? WHERE id = ?").run(mode, id).changes;
-      if (changed === 0) return reply.code(404).send({ error: "No such game." });
+      if (changed === 0) return reply.code(404).send({ error: "Spiel nicht gefunden." });
 
       broadcast({ type: "library-changed" });
       return { ok: true, id, mode };

@@ -5,6 +5,7 @@ import Avatar from "../components/Avatar";
 import { IconCamera } from "../components/icons";
 import ManageLibrary from "../components/ManageLibrary";
 import { toSquareDataUrl } from "../utils/image";
+import SummaryControl from "../components/SummaryControl";
 import SyncControl from "../components/SyncControl";
 
 export default function Settings({
@@ -40,7 +41,7 @@ export default function Settings({
             : users.filter((u) => u.isAdmin).map((u) => u.id)
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load players");
+      setError(err instanceof Error ? err.message : "Profile konnten nicht geladen werden");
     }
   }
 
@@ -61,7 +62,7 @@ export default function Settings({
       onChanged();
       await loadPlayers();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Da ist etwas schiefgegangen");
     } finally {
       setBusy(false);
     }
@@ -70,18 +71,18 @@ export default function Settings({
   return (
     <div className="settings-page">
       <section className="panel">
-        <h3>Swipe round</h3>
+        <h3>Runde</h3>
         {round ? (
           <p className="panel-hint">
-            Running with <strong>{round.playerCount}</strong>{" "}
-            {round.playerCount === 1 ? "player" : "players"}: {round.players.map((p) => p.displayName).join(", ")}.
-            The deck is filtered to games that play with {round.playerCount}.
+            Läuft mit <strong>{round.playerCount}</strong>{" "}
+            {round.playerCount === 1 ? "Person" : "Personen"}: {round.players.map((p) => p.displayName).join(", ")}.
+            Im Stapel landen nur Spiele, die zu {round.playerCount} gehen.
           </p>
         ) : (
-          <p className="panel-hint">No round running. Pick who is playing and start one.</p>
+          <p className="panel-hint">Keine Runde aktiv. Wähle aus, wer mitspielt, und starte eine.</p>
         )}
 
-        <p className="field-label">Who is playing?</p>
+        <p className="field-label">Wer spielt mit?</p>
         <div className="chip-list">
           {players.map((p) => (
             <button
@@ -90,7 +91,7 @@ export default function Settings({
               onClick={() => toggle(p.id)}
             >
               {p.displayName}
-              {!p.isAdmin && <span className="chip-tag">extra</span>}
+              {!p.isAdmin && <span className="chip-tag">Gast</span>}
             </button>
           ))}
         </div>
@@ -102,13 +103,13 @@ export default function Settings({
             onClick={() =>
               run(async () => {
                 const { round: started } = await api.startRound(selected);
-                return `New round started with ${started.playerCount} ${
-                  started.playerCount === 1 ? "player" : "players"
-                }. Previous swipes cleared.`;
+                return `Neue Runde mit ${started.playerCount} ${
+                  started.playerCount === 1 ? "Person" : "Personen"
+                } gestartet. Die bisherigen Swipes sind gelöscht.`;
               })
             }
           >
-            Start new round
+            Neue Runde starten
           </button>
           <button
             className="btn btn-ghost"
@@ -116,30 +117,30 @@ export default function Settings({
             onClick={() =>
               run(async () => {
                 const r = await api.resetRound();
-                return `Round reset — ${r.swipes} swipes and ${r.matches} pending matches cleared.`;
+                return `Runde zurückgesetzt — ${r.swipes} Swipes und ${r.matches} offene Matches gelöscht.`;
               })
             }
           >
-            Reset current round
+            Runde zurücksetzen
           </button>
         </div>
         <p className="panel-hint">
-          Starting or resetting clears everyone's swipes so you begin fresh. Games you already
-          marked as played stay in the history.
+          Starten oder Zurücksetzen löscht alle Swipes, damit ihr frisch anfangt. Was ihr schon
+          als gespielt markiert habt, bleibt erhalten.
         </p>
       </section>
 
       <section className="panel">
-        <h3>Profiles</h3>
+        <h3>Profile</h3>
         <p className="panel-hint">
-          Anyone who swipes needs a profile — it is how their picks are counted. Profiles stay,
-          so someone who plays again keeps their pick ratings. They can swipe but not change
-          settings. Add a photo and it shows on the sign-in screen.
+          Wer mitswipet, braucht ein Profil — darüber werden die Stimmen gezählt. Profile bleiben
+          erhalten, wer wiederkommt, behält also seine Statistik. Gäste können swipen, aber keine
+          Einstellungen ändern. Ein Foto erscheint auf dem Anmeldebildschirm.
         </p>
         <div className="inline-form">
           <input
             type="text"
-            placeholder="Profile name"
+            placeholder="Name"
             value={newProfile}
             onChange={(e) => setNewProfile(e.target.value)}
             onKeyDown={(e) => {
@@ -147,7 +148,7 @@ export default function Settings({
                 run(async () => {
                   const p = await api.addProfile(newProfile.trim());
                   setNewProfile("");
-                  return `Added ${p.displayName}.`;
+                  return `${p.displayName} hinzugefügt.`;
                 });
               }
             }}
@@ -159,11 +160,11 @@ export default function Settings({
               run(async () => {
                 const p = await api.addProfile(newProfile.trim());
                 setNewProfile("");
-                return `Added ${p.displayName}.`;
+                return `${p.displayName} hinzugefügt.`;
               })
             }
           >
-            Add
+            Hinzufügen
           </button>
         </div>
         <div className="list-rows">
@@ -171,13 +172,13 @@ export default function Settings({
             <div className="list-row" key={p.id}>
               <span className="list-row-main">
                 <Avatar name={p.displayName} src={p.avatar} isAdmin={p.isAdmin} />
-                {p.displayName} {p.isAdmin && <span className="chip-tag">admin</span>}
+                {p.displayName} {p.isAdmin && <span className="chip-tag">Admin</span>}
               </span>
               <span className="row-buttons">
                 {/* A hidden file input behind a label is the only way to style the picker. */}
                 <label className={`btn btn-quiet photo-button ${busy ? "is-busy" : ""}`}>
                   <IconCamera />
-                  {p.avatar ? "Change" : "Photo"}
+                  {p.avatar ? "Ändern" : "Foto"}
                   <input
                     type="file"
                     accept="image/*"
@@ -188,7 +189,7 @@ export default function Settings({
                       if (!file) return;
                       run(async () => {
                         await api.setAvatar(p.id, await toSquareDataUrl(file));
-                        return `Updated ${p.displayName}'s picture.`;
+                        return `Foto von ${p.displayName} aktualisiert.`;
                       });
                     }}
                   />
@@ -200,11 +201,11 @@ export default function Settings({
                     onClick={() =>
                       run(async () => {
                         await api.removeAvatar(p.id);
-                        return `Removed ${p.displayName}'s picture.`;
+                        return `Foto von ${p.displayName} entfernt.`;
                       })
                     }
                   >
-                    Clear
+                    Entfernen
                   </button>
                 )}
                 {!p.isAdmin && (
@@ -214,11 +215,11 @@ export default function Settings({
                     onClick={() =>
                       run(async () => {
                         await api.removeProfile(p.id);
-                        return `Removed ${p.displayName}.`;
+                        return `${p.displayName} entfernt.`;
                       })
                     }
                   >
-                    Remove
+                    Löschen
                   </button>
                 )}
               </span>
@@ -228,6 +229,8 @@ export default function Settings({
       </section>
 
       <ManageLibrary refreshToken={refreshToken} />
+
+      <SummaryControl refreshToken={refreshToken} />
 
       <section className="panel">
         <h3>BoardGameGeek</h3>

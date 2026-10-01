@@ -15,6 +15,10 @@ Two workspaces, no monorepo tooling — install and build each separately:
   Serves the API, the WebSocket at `/ws`, and the built client as static files.
 - `client/` — React 18 + Vite + TypeScript. Mobile-first; assume a phone held one-handed.
 
+**The UI is German**, and so is every message the server sends that can reach the screen —
+errors, sync progress, import results. There is no i18n layer; write German directly. Code,
+comments and commit messages stay English.
+
 ## Commands
 
 ```bash
@@ -65,6 +69,12 @@ there and `/thing` does not. The token lives in `.env` as `BGG_TOKEN` and nowher
 never appear in a repository file, a test fixture, or a commit message. BGG is also behind
 Cloudflare; the bundled Chromium in `server/src/browser.ts` is the fallback for a tokenless setup
 and is not exercised against real BGG from CI or a sandbox.
+
+**Game summaries come from the Claude API** (`server/src/summaries.ts`), written once per game
+from BGG's `description` and cached in `games.summary`. `summary_source` is `'ai'` or `'manual'`;
+the generator only ever fills `NULL`s, so a hand-written summary is never overwritten. It needs
+`ANTHROPIC_API_KEY` — like `BGG_TOKEN`, only ever in `.env`. To test it without a key or spend,
+point `ANTHROPIC_BASE_URL` at a local mock of the Messages API; the SDK honours it.
 
 **A collection response calls everything a `boardgame`.** Only `/thing` marks expansions. Skip
 the detail step and expansions land in the swipe deck as standalone games.

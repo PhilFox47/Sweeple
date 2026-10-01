@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
-import { authenticate } from "../auth.js";
+import { authenticate, requireAdmin } from "../auth.js";
+import { broadcast } from "../ws.js";
 import { OPENING_CARDS, openingHands, weightFor, weightedOrder, type Candidate } from "../deck.js";
 import { reconcileMatches, recordDeckTotal } from "../matching.js";
 import { activeRoundId, getActiveRound } from "../rounds.js";
 import { ratingsForUser } from "../stats.js";
+import { generateMissingSummaries, setManualSummary, summaryStatus } from "../summaries.js";
 
 interface GameRow {
   id: number;
@@ -26,6 +28,7 @@ interface GameRow {
   best_players: string;
   recommended_players: string;
   expansion_mode: string;
+  summary: string | null;
   num_plays: number;
   last_played_at: string | null;
   is_expansion: number;
@@ -56,6 +59,7 @@ function serializeGame(row: GameRow) {
     lastPlayedAt: row.last_played_at,
     isExpansion: !!row.is_expansion,
     expansionMode: (row.expansion_mode ?? "auto") as "auto" | "hidden" | "standalone",
+    summary: row.summary ?? null,
   };
 }
 
@@ -240,6 +244,37 @@ export default async function gamesRoutes(app: FastifyInstance) {
       games: ordered.map((row) => ({ ...serializeGame(row), yourVotes: mine.get(row.id) ?? { likes: 0, total: 0 } })),
     };
   });
+
+  app.get("/api/summaries", { preHandler: [authenticate, requireAdmin] }, async () => summaryStatus());
+
+  app.post("/api/summaries/generate", { preHandler: [authenticate, requireAdmin] }, async (_request, reply) => {
+    const status = summaryStatus();
+    if (!status.configured) {
+      return reply.code(400).send({ error: "Für automatische Kurzbeschreibungen fehlt ANTHROPIC_API_KEY in der .env." });
+    }
+    // Runs in the background; progress arrives as summaries-changed events and via polling.
+    void generateMissingSummaries();
+    return { ...summaryStatus(), running: true };
+  });
+
+  app.put<{ Params: { id: string }; Body: { summary: string | null } }>(
+    "/api/games/:id/summary",
+    { preHandler: [authenticate, requireAdmin] },
+    async (request, reply) => {
+      const summary = request.body?.summary ?? null;
+      if (summary !== null && typeof summary !== "string") {
+        return reply.code(400).send({ error: "Die Kurzbeschreibung muss Text sein." });
+      }
+      if (summary && summary.length > 600) {
+        return reply.code(400).send({ error: "Bitte höchstens zwei, drei Sätze." });
+      }
+      if (!setManualSummary(Number(request.params.id), summary)) {
+        return reply.code(404).send({ error: "Spiel nicht gefunden." });
+      }
+      broadcast({ type: "library-changed" });
+      return { ok: true };
+    }
+  );
 
   app.get("/api/meta/categories", { preHandler: authenticate }, async () => {
     const rows = db.prepare("SELECT categories FROM games WHERE owned = 1").all() as { categories: string }[];

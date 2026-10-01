@@ -36,6 +36,8 @@ export interface Game {
   lastPlayedAt: string | null;
   isExpansion: boolean;
   expansionMode: ExpansionMode;
+  /** Two or three German sentences on what to expect, for someone who has never played it. */
+  summary: string | null;
   /** How the player looking at the card has voted on it before. */
   yourVotes: { likes: number; total: number };
 }
@@ -55,6 +57,18 @@ export interface LibraryGame {
   /** Whether the deck currently leaves it out, once the override is applied. */
   hidden: boolean;
   rating: GameRating;
+  summary: string | null;
+  /** "ai" when generated, "manual" when written by hand — a hand-written one is never replaced. */
+  summarySource: "ai" | "manual" | null;
+}
+
+export interface SummaryStatus {
+  configured: boolean;
+  running: boolean;
+  missing: number;
+  missingWithDescription: number;
+  done: number;
+  lastError: string | null;
 }
 
 export type MatchKind = "full" | "soft";
@@ -147,6 +161,9 @@ export interface Filters {
   includeExpansions?: boolean;
 }
 
+/** The server's message for a sync the user stopped, as opposed to one that failed. */
+export const SYNC_STOPPED = "Abgleich gestoppt";
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
     ...options,
@@ -159,7 +176,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Request failed: ${res.status}`);
+    throw new Error(body.error ?? `Anfrage fehlgeschlagen (${res.status})`);
   }
   return res.json();
 }
@@ -216,6 +233,11 @@ export const api = {
       body: JSON.stringify({ dataUrl }),
     }),
   removeAvatar: (id: number) => request<{ ok: true }>(`/api/users/${id}/avatar`, { method: "DELETE" }),
+
+  summaryStatus: () => request<SummaryStatus>("/api/summaries"),
+  generateSummaries: () => request<SummaryStatus>("/api/summaries/generate", { method: "POST" }),
+  setSummary: (gameId: number, summary: string | null) =>
+    request<{ ok: true }>(`/api/games/${gameId}/summary`, { method: "PUT", body: JSON.stringify({ summary }) }),
 
   library: () => request<{ games: LibraryGame[] }>("/api/library"),
   setGameVisibility: (id: number, mode: ExpansionMode) =>

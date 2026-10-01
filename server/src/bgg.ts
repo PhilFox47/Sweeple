@@ -17,7 +17,7 @@ const MAX_WAIT_MS = 30 * 60 * 1000;
 
 class SyncCancelledError extends Error {
   constructor() {
-    super("Sync stopped");
+    super("Abgleich gestoppt");
     this.name = "SyncCancelledError";
   }
 }
@@ -180,7 +180,7 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
 
     if (res.status >= 200 && res.status < 300) {
       if (!isQueuedBody(res.body)) return res.body;
-      waitReason = `BGG is preparing the ${label}`;
+      waitReason = `BGG bereitet „${label}“ vor`;
     } else if (res.status === 429 || res.status === 401 || res.status === 403 || res.status >= 500) {
       // Log the first one and then occasionally, so a persistent block is visible in the logs.
       if (attempt === 1 || attempt % 6 === 0) logRejection(url, res, res.body);
@@ -194,39 +194,39 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
         // would only hide the real problem behind a slower failure.
         if (configuredToken()) {
           throw new Error(
-            `BGG rejected the API token on the ${label} request (HTTP ${res.status}, ${challenge}). ` +
-              "Check BGG_TOKEN against https://boardgamegeek.com/applications — the token must belong " +
-              "to an approved application and be sent to boardgamegeek.com without a leading www."
+            `BGG hat das API-Token bei der Anfrage „${label}“ abgelehnt (HTTP ${res.status}, ${challenge}). ` +
+              "BGG_TOKEN mit https://boardgamegeek.com/applications abgleichen — das Token muss zu einer " +
+              "freigegebenen Anwendung gehören und an boardgamegeek.com ohne www gehen."
           );
         }
         if (!useBrowser && FETCH_MODE === "auto") {
           useBrowser = true;
-          onProgress?.("BGG demanded credentials — switching to the built-in browser");
+          onProgress?.("BGG verlangt eine Anmeldung — wechsle zum eingebauten Browser");
           console.warn(`[bgg] ${res.status} ${challenge} over plain HTTP; retrying via Chromium.`);
           continue;
         }
         throw new Error(
-          `BGG requires an API token for the ${label} request (HTTP ${res.status}, ${challenge}). ` +
-            "Register an application at https://boardgamegeek.com/applications, create a token, " +
-            "and set BGG_TOKEN in your .env."
+          `BGG verlangt für die Anfrage „${label}“ ein API-Token (HTTP ${res.status}, ${challenge}). ` +
+            "Unter https://boardgamegeek.com/applications eine Anwendung registrieren, ein Token " +
+            "erzeugen und als BGG_TOKEN in die .env eintragen."
         );
       }
 
-      waitReason = `BGG is throttling the ${label} request (HTTP ${res.status})`;
+      waitReason = `BGG bremst die Anfrage „${label}“ (HTTP ${res.status})`;
     } else {
       logRejection(url, res, res.body);
       const body = res.body.replace(/\s+/g, " ").trim().slice(0, 300);
-      throw new Error(`BGG request failed (${res.status}) for ${url}.${body ? ` BGG said: ${body}` : ""}`);
+      throw new Error(`BGG-Anfrage fehlgeschlagen (${res.status}) für ${url}.${body ? ` Antwort von BGG: ${body}` : ""}`);
     }
 
     if (Date.now() > deadline) {
       throw new Error(
-        `Gave up after ${Math.round(MAX_WAIT_MS / 60000)} minutes waiting for BGG to return the ${label}. ` +
-          `Last state: ${waitReason}.`
+        `Nach ${Math.round(MAX_WAIT_MS / 60000)} Minuten Warten auf „${label}“ von BGG aufgegeben. ` +
+          `Zuletzt: ${waitReason}.`
       );
     }
 
-    onProgress?.(`${waitReason} — retrying every ${POLL_INTERVAL_MS / 1000}s (attempt ${attempt})`);
+    onProgress?.(`${waitReason} — neuer Versuch alle ${POLL_INTERVAL_MS / 1000} s (Versuch ${attempt})`);
     await sleep(POLL_INTERVAL_MS, signal);
   }
 }
@@ -234,7 +234,7 @@ async function fetchWithRetry(url: string, label: string, options: BggRequestOpt
 // BGG reports some failures (e.g. an unknown username) as HTTP 200 with an <errors> body.
 function assertNoXmlError(xml: string, context: string) {
   const match = xml.match(/<error>[\s\S]*?<message>([\s\S]*?)<\/message>/i);
-  if (match) throw new Error(`BGG rejected the ${context} request: ${match[1].trim()}`);
+  if (match) throw new Error(`BGG hat die Anfrage „${context}“ abgelehnt: ${match[1].trim()}`);
 }
 
 function toArray<T>(value: T | T[] | undefined): T[] {
@@ -253,9 +253,9 @@ export interface CollectionItem {
 }
 
 export function parseCollectionXml(xml: string): CollectionItem[] {
-  assertNoXmlError(xml, "collection");
+  assertNoXmlError(xml, "Sammlung");
   const doc = parser.parse(xml);
-  if (!doc?.items) throw new Error("That does not look like a BGG collection response.");
+  if (!doc?.items) throw new Error("Das sieht nicht nach einer BGG-Sammlung aus.");
 
   return toArray(doc.items.item).map((item: any) => ({
     bggId: Number(item["@_objectid"]),
@@ -278,7 +278,7 @@ export async function fetchCollection(
   // twice at once (games and expansions separately) makes it reject one of them.
   const xml = await fetchWithRetry(
     `${BASE}/collection?username=${encodeURIComponent(username)}&own=1`,
-    "collection",
+    "Sammlung",
     options
   );
   return parseCollectionXml(xml);
@@ -311,6 +311,32 @@ export interface GameDetails {
   isExpansion: boolean;
   bestPlayers: number[];
   recommendedPlayers: number[];
+  /** BGG's own description, plain text, English. Grounding for the German summary. */
+  description: string | null;
+}
+
+/** Long enough for any real description; a cap so one runaway entry cannot bloat a prompt. */
+const DESCRIPTION_LIMIT = 6000;
+
+/**
+ * BGG escapes its descriptions twice — the XML layer decodes `&amp;quot;` to `&quot;`, and the
+ * text still has HTML entities and `&#10;` line breaks in it — so finish the job here.
+ */
+export function cleanDescription(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const named: Record<string, string> = {
+    quot: '"', amp: "&", apos: "'", lt: "<", gt: ">", nbsp: " ",
+    mdash: "—", ndash: "–", hellip: "…", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
+  };
+  const text = raw
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&([a-z]+);/gi, (match, name) => named[name.toLowerCase()] ?? match)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .trim();
+  return text ? text.slice(0, DESCRIPTION_LIMIT) : null;
 }
 
 /**
@@ -348,9 +374,9 @@ function parseSuggestedPlayers(item: any): { best: number[]; recommended: number
 }
 
 export function parseThingXml(xml: string): GameDetails[] {
-  assertNoXmlError(xml, "game details");
+  assertNoXmlError(xml, "Spieldetails");
   const doc = parser.parse(xml);
-  if (!doc?.items) throw new Error("That does not look like a BGG thing (game details) response.");
+  if (!doc?.items) throw new Error("Das sieht nicht nach BGG-Spieldetails aus.");
 
   return toArray(doc.items.item).map((item: any) => {
     const names = toArray(item.name);
@@ -382,6 +408,7 @@ export function parseThingXml(xml: string): GameDetails[] {
       isExpansion: item["@_type"] === "boardgameexpansion",
       bestPlayers: suggested.best,
       recommendedPlayers: suggested.recommended,
+      description: cleanDescription(item.description),
     };
   });
 }
@@ -395,8 +422,8 @@ export async function fetchGameDetails(
   const totalChunks = Math.ceil(bggIds.length / chunkSize);
   for (let i = 0; i < bggIds.length; i += chunkSize) {
     const chunk = bggIds.slice(i, i + chunkSize);
-    options.onProgress?.(`Fetching game details ${Math.floor(i / chunkSize) + 1}/${totalChunks}`);
-    const xml = await fetchWithRetry(thingUrl(chunk), "game details", options);
+    options.onProgress?.(`Lade Spieldetails ${Math.floor(i / chunkSize) + 1}/${totalChunks}`);
+    const xml = await fetchWithRetry(thingUrl(chunk), "Spieldetails", options);
     results.push(...parseThingXml(xml));
     // Be polite to BGG's API between chunks.
     if (i + chunkSize < bggIds.length) await sleep(1500, options.signal);
@@ -412,9 +439,9 @@ export interface PlayStats {
 
 /** Aggregates one page of play records. Callers merge pages via `mergePlayStats`. */
 export function parsePlaysXml(xml: string, into = new Map<number, PlayStats>()): Map<number, PlayStats> {
-  assertNoXmlError(xml, "play history");
+  assertNoXmlError(xml, "Partien");
   const doc = parser.parse(xml);
-  if (!doc?.plays) throw new Error("That does not look like a BGG plays response.");
+  if (!doc?.plays) throw new Error("Das sieht nicht nach BGG-Partien aus.");
 
   for (const play of toArray(doc.plays.play)) {
     const bggId = Number((play as any).item?.["@_objectid"]);
@@ -440,8 +467,8 @@ export async function fetchPlayStats(
   let page = 1;
   for (;;) {
     const url = `${BASE}/plays?username=${encodeURIComponent(username)}&page=${page}`;
-    options.onProgress?.(`Fetching play history (page ${page})`);
-    const xml = await fetchWithRetry(url, "play history", options);
+    options.onProgress?.(`Lade Partien (Seite ${page})`);
+    const xml = await fetchWithRetry(url, "Partien", options);
     const doc = parser.parse(xml);
     const plays = toArray(doc?.plays?.play);
     if (plays.length === 0) break;

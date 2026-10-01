@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS games (
   num_plays INTEGER NOT NULL DEFAULT 0,
   last_played_at TEXT,
   is_expansion INTEGER NOT NULL DEFAULT 0,
+  description TEXT,
+  summary TEXT,
+  summary_source TEXT CHECK (summary_source IN ('ai', 'manual')),
   owned INTEGER NOT NULL DEFAULT 1,
   last_synced_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))

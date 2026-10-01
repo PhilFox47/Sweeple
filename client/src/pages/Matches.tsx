@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Match, type MatchThreshold } from "../api";
 import { IconSparkle } from "../components/icons";
+import { decimal } from "../utils/format";
 
 function meta(match: Match): string {
   const bits: string[] = [];
   if (match.minPlayers && match.maxPlayers) {
-    bits.push(match.minPlayers === match.maxPlayers ? `${match.minPlayers}p` : `${match.minPlayers}–${match.maxPlayers}p`);
+    bits.push(match.minPlayers === match.maxPlayers ? `${match.minPlayers} Sp.` : `${match.minPlayers}–${match.maxPlayers} Sp.`);
   }
   if (match.playingTime) bits.push(`${match.playingTime} min`);
-  if (match.weight !== null) bits.push(`weight ${match.weight.toFixed(1)}`);
+  if (match.weight !== null) bits.push(`Komplexität ${decimal(match.weight)}`);
   return bits.join(" · ");
 }
 
@@ -16,11 +17,11 @@ function meta(match: Match): string {
 function thresholdNote(threshold: MatchThreshold | null): string | null {
   if (!threshold || threshold.players < 3) return null;
   if (threshold.required < threshold.players) {
-    return `Soft matches count now: ${threshold.required} of ${threshold.players} likes is enough.`;
+    return `Mehrheits-Matches zählen jetzt: ${threshold.required} von ${threshold.players} Stimmen reichen.`;
   }
-  return `Everyone has to agree for now. Once a third player is three quarters through their deck, ${
+  return `Noch müssen alle zustimmen. Sobald ein dritter Spieler drei Viertel seines Stapels durch hat, reichen ${
     threshold.players - 1
-  } of ${threshold.players} will do.`;
+  } von ${threshold.players}.`;
 }
 
 export default function Matches({
@@ -55,7 +56,7 @@ export default function Matches({
       await api.markPlayed(matchId);
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update that match");
+      setError(err instanceof Error ? err.message : "Das Match konnte nicht aktualisiert werden");
     }
   }
 
@@ -106,7 +107,7 @@ export default function Matches({
           <div className="match-meta">
             {chosenId === match.id && !rolling ? (
               <span className="pick-note">
-                <IconSparkle /> Tonight's pick
+                <IconSparkle /> Heute gespielt wird
               </span>
             ) : (
               <>
@@ -121,7 +122,7 @@ export default function Matches({
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => markPlayed(match.id)}>
-          Played
+          Gespielt
         </button>
       </div>
     );
@@ -133,12 +134,12 @@ export default function Matches({
 
       <div className="matches-head">
         <div className="section-heading">
-          Ready to play{pending.length > 0 ? ` · ${pending.length}` : ""}
+          Bereit zum Spielen{pending.length > 0 ? ` · ${pending.length}` : ""}
         </div>
         {pending.length > 1 && (
           <button className="btn btn-ghost btn-choose" onClick={chooseForMe} disabled={rolling}>
             <IconSparkle />
-            {rolling ? "Choosing…" : "Choose for me"}
+            {rolling ? "Wähle…" : "Wähl für mich"}
           </button>
         )}
       </div>
@@ -148,16 +149,16 @@ export default function Matches({
       {pending.length === 0 ? (
         <div className="empty-state">
           <div className="empty-emoji">🤝</div>
-          <h3>No matches yet</h3>
-          <p>When everyone swipes right on the same game it lands here.</p>
+          <h3>Noch keine Matches</h3>
+          <p>Sobald alle beim selben Spiel nach rechts swipen, landet es hier.</p>
         </div>
       ) : (
         <>
           {full.map((match) => card(match))}
           {soft.length > 0 && (
             <>
-              <div className="section-heading soft-heading">Soft matches · {soft.length}</div>
-              <p className="threshold-note">Most of you liked these, not everyone.</p>
+              <div className="section-heading soft-heading">Mehrheits-Matches · {soft.length}</div>
+              <p className="threshold-note">Die meisten wollen diese, aber nicht alle.</p>
               {soft.map((match) => card(match))}
             </>
           )}
@@ -166,13 +167,13 @@ export default function Matches({
 
       {played.length > 0 && (
         <>
-          <div className="section-heading">History</div>
+          <div className="section-heading">Schon gespielt</div>
           {played.map((match) => (
             <div className="match-card match-played" key={match.id}>
               {match.thumbnail ? <img src={match.thumbnail} alt="" loading="lazy" /> : <img alt="" />}
               <div className="match-info">
                 <h3>{match.name}</h3>
-                <div className="match-meta">Played {new Date(match.playedAt!).toLocaleDateString()}</div>
+                <div className="match-meta">Gespielt am {new Date(match.playedAt!).toLocaleDateString("de-DE")}</div>
               </div>
             </div>
           ))}

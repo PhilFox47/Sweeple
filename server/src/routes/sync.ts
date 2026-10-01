@@ -6,7 +6,7 @@ import { isSyncInProgress, runSync, stopSync } from "../sync.js";
 export default async function syncRoutes(app: FastifyInstance) {
   app.post("/api/sync", { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
     if (isSyncInProgress()) {
-      return reply.code(409).send({ error: "Sync already in progress" });
+      return reply.code(409).send({ error: "Ein Abgleich läuft bereits." });
     }
     runSync().catch((err) => app.log.error(err, "BGG sync failed"));
     return { ok: true, started: true };

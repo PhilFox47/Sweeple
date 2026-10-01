@@ -79,6 +79,7 @@ const updateDetails = db.prepare(`
     is_expansion = @isExpansion,
     best_players = @bestPlayers,
     recommended_players = @recommendedPlayers,
+    description = @description,
     last_synced_at = datetime('now'),
     updated_at = datetime('now')
   WHERE bgg_id = @bggId
@@ -104,6 +105,7 @@ export function applyDetails(details: GameDetails[]): { updated: number; unknown
         isExpansion: d.isExpansion ? 1 : 0,
         bestPlayers: JSON.stringify(d.bestPlayers),
         recommendedPlayers: JSON.stringify(d.recommendedPlayers),
+        description: d.description,
       }).changes;
       if (changes > 0) updated += 1;
       else unknown += 1;
@@ -140,7 +142,9 @@ export function applyPlays(stats: Map<number, PlayStats>): { updated: number } {
 export function gamesMissingDetails(): number[] {
   return (
     db
-      .prepare("SELECT bgg_id FROM games WHERE owned = 1 AND weight IS NULL ORDER BY bgg_id")
+      // A missing description counts too: games imported before descriptions were kept have
+      // their stats but nothing to write a summary from.
+      .prepare("SELECT bgg_id FROM games WHERE owned = 1 AND (weight IS NULL OR description IS NULL) ORDER BY bgg_id")
       .all() as { bgg_id: number }[]
   ).map((r) => r.bgg_id);
 }

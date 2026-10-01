@@ -30,7 +30,7 @@ export default async function matchesRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>("/api/matches/:id/played", { preHandler: authenticate }, async (request, reply) => {
     const id = Number(request.params.id);
     const match = db.prepare("SELECT id FROM matches WHERE id = ?").get(id) as { id: number } | undefined;
-    if (!match) return reply.code(404).send({ error: "Match not found" });
+    if (!match) return reply.code(404).send({ error: "Match nicht gefunden." });
 
     // Swipes are left alone. Clearing them used to be how a played game came round again, but a
     // new round wipes them anyway — doing it here only put tonight's game back into tonight's

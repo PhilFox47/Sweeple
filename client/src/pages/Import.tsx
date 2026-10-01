@@ -16,7 +16,7 @@ function LinkRow({ url, label }: { url: string; label: string }) {
           setTimeout(() => setCopied(false), 1500);
         }}
       >
-        {copied ? "Copied" : "Copy link"}
+        {copied ? "Kopiert" : "Link kopieren"}
       </button>
     </div>
   );
@@ -33,7 +33,7 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
     try {
       setLinks(await api.importLinks());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load import links");
+      setError(err instanceof Error ? err.message : "Die Import-Links konnten nicht geladen werden");
     }
   }
 
@@ -52,7 +52,7 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
       await load();
       onImported();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      setError(err instanceof Error ? err.message : "Import fehlgeschlagen");
     } finally {
       setBusy(false);
     }
@@ -64,77 +64,77 @@ export default function Import({ refreshToken, onImported }: { refreshToken: num
     <div className="import-page">
       {links?.hasToken ? (
         <p className="form-ok">
-          A BGG API token is configured, so <strong>Sync with BGG</strong> can fetch everything
-          automatically. Manual import below stays available as a fallback.
+          Ein BGG-API-Token ist eingerichtet, <strong>Mit BGG abgleichen</strong> holt also alles
+          automatisch. Der Import von Hand unten bleibt als Ausweichweg erhalten.
         </p>
       ) : (
         <p className="panel-hint">
-          Without a BGG API token the server cannot call the API, so fetch each link in your browser
-          and paste the response below. Sweeple works out which kind of response it is.
+          Ohne BGG-API-Token kann der Server die API nicht abfragen. Öffne dann jeden Link im Browser
+          und füge die Antwort unten ein — Sweeple erkennt selbst, um welche es sich handelt.
         </p>
       )}
 
       <section className="panel">
-        <h3>1. Your collection</h3>
+        <h3>1. Deine Sammlung</h3>
         <p className="panel-hint">
-          Open this, and if it says the request is being processed, reload after a few seconds until
-          you see the game list.
+          Öffnen, und falls dort steht, dass die Anfrage bearbeitet wird: nach ein paar Sekunden neu
+          laden, bis die Spieleliste erscheint.
         </p>
-        {links && <LinkRow url={links.collectionUrl} label={`Collection for ${links.username || "?"}`} />}
+        {links && <LinkRow url={links.collectionUrl} label={`Sammlung von ${links.username || "?"}`} />}
         {links && (
           <p className="panel-hint">
             {links.gamesTotal > 0
-              ? `${links.gamesTotal} games in your library.`
-              : "No games imported yet."}
+              ? `${links.gamesTotal} Spiele in der Bibliothek.`
+              : "Noch keine Spiele importiert."}
           </p>
         )}
       </section>
 
       <section className="panel">
-        <h3>2. Game details</h3>
+        <h3>2. Spieldetails</h3>
         <p className="panel-hint">
-          Player counts, playtime, weight, categories and mechanics — and which entries are
-          expansions. BGG caps this at 20 games per request, so there may be several links.
-          {" "}<strong>This endpoint requires an API token</strong>, which a browser cannot send —
-          opening these links without one returns "Unauthorized". Set BGG_TOKEN and use Sync
-          with BGG instead.
+          Spielerzahl, Spieldauer, Komplexität, Kategorien, Mechaniken und die Beschreibung — und
+          welche Einträge Erweiterungen sind. BGG liefert höchstens 20 Spiele pro Anfrage, daher
+          eventuell mehrere Links.{" "}<strong>Dieser Endpunkt braucht ein API-Token</strong>, das ein
+          Browser nicht mitschicken kann — ohne liefern die Links „Unauthorized“. Besser BGG_TOKEN
+          setzen und mit BGG abgleichen.
         </p>
         {links && links.gamesTotal > 0 && (
           <p className="panel-hint">
-            {links.gamesWithDetails} of {links.gamesTotal} games have details
-            {remaining > 0 ? ` — ${remaining} link${remaining === 1 ? "" : "s"} left to paste.` : " — all done."}
+            {links.gamesWithDetails} von {links.gamesTotal} Spielen haben Details
+            {remaining > 0 ? ` — noch ${remaining} ${remaining === 1 ? "Link" : "Links"} einzufügen.` : " — alles erledigt."}
           </p>
         )}
         {links?.detailBatches.map((batch, i) => (
-          <LinkRow key={batch.url} url={batch.url} label={`Details batch ${i + 1} (${batch.count} games)`} />
+          <LinkRow key={batch.url} url={batch.url} label={`Details, Teil ${i + 1} (${batch.count} Spiele)`} />
         ))}
       </section>
 
       <section className="panel">
-        <h3>3. Play history (optional)</h3>
+        <h3>3. Partien (optional)</h3>
         <p className="panel-hint">
-          Adds the dates behind the "not played recently" filter. Play counts already come from your
-          collection. Also token-only. If you have many plays, paste each page (add{" "}
-          <code>&amp;page=2</code> and so on).
+          Liefert die Daten für den Filter „seit … Tagen nicht gespielt“. Die Anzahl der Partien
+          kommt schon aus der Sammlung. Ebenfalls nur mit Token. Bei vielen Partien jede Seite
+          einzeln einfügen (<code>&amp;page=2</code> anhängen und so weiter).
         </p>
-        {links && <LinkRow url={links.playsUrl} label="Play history" />}
+        {links && <LinkRow url={links.playsUrl} label="Partien" />}
       </section>
 
       <section className="panel">
-        <h3>Paste the response</h3>
+        <h3>Antwort einfügen</h3>
         <textarea
           className="import-textarea"
           value={xml}
           onChange={(e) => setXml(e.target.value)}
-          placeholder="Paste the XML from any of the links above…"
+          placeholder="XML aus einem der Links oben hier einfügen…"
           spellCheck={false}
         />
         <div className="row-actions">
           <button className="btn btn-primary" onClick={handleImport} disabled={busy || !xml.trim()}>
-            {busy ? "Importing…" : "Import"}
+            {busy ? "Importiere…" : "Importieren"}
           </button>
           <button className="btn btn-ghost" onClick={() => setXml("")} disabled={!xml}>
-            Clear
+            Leeren
           </button>
         </div>
         {result && <div className="form-ok">{result}</div>}

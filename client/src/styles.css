@@ -630,6 +630,19 @@ textarea:focus {
   white-space: nowrap;
 }
 
+/* Clamped: a long generated summary must never push the stats off a small phone's card. */
+.card-summary {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--text);
+  opacity: 0.9;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .card-played {
   font-size: 0.75rem;
   color: var(--text-faint);
@@ -1004,6 +1017,8 @@ textarea:focus {
 }
 
 .stat-label {
+  /* German labels run longer and wrap in the narrow tiles; keep them under their number. */
+  text-align: center;
   font-size: 0.7rem;
   color: var(--text-faint);
   text-transform: uppercase;
@@ -1205,6 +1220,44 @@ textarea:focus {
   border-radius: 999px;
   background: var(--surface-2);
   border: 1px solid var(--border);
+}
+
+/* The game's name and stats open its summary editor, so they are a button underneath. */
+button.library-meta {
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.no-summary {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+.summary-editor {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary-editor textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.summary-editor-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.summary-source {
+  margin-right: auto;
+  font-size: 0.74rem;
+  color: var(--text-faint);
 }
 
 .library-group {

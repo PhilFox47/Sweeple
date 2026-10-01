@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Game } from "../api";
+import { decimal } from "../utils/format";
 import { IconSparkle, IconUsers } from "./icons";
 
 /** Compresses [2,3,4,6] into "2–4, 6" so the line stays short on a phone. */
@@ -16,9 +17,9 @@ function formatCounts(counts: number[]): string {
 }
 
 function playerRange(game: Game): string {
-  if (!game.minPlayers && !game.maxPlayers) return "? players";
-  if (game.minPlayers === game.maxPlayers) return `${game.minPlayers} players`;
-  return `${game.minPlayers ?? "?"}–${game.maxPlayers ?? "?"} players`;
+  if (!game.minPlayers && !game.maxPlayers) return "? Spieler";
+  if (game.minPlayers === game.maxPlayers) return `${game.minPlayers} Spieler`;
+  return `${game.minPlayers ?? "?"}–${game.maxPlayers ?? "?"} Spieler`;
 }
 
 function playtime(game: Game): string | null {
@@ -39,26 +40,26 @@ function weightClass(weight: number): string {
 }
 
 function lastPlayedLabel(game: Game): string {
-  if (!game.lastPlayedAt) return game.numPlays > 0 ? `Played ${game.numPlays}×` : "Never played";
+  if (!game.lastPlayedAt) return game.numPlays > 0 ? `${game.numPlays}× gespielt` : "Noch nie gespielt";
   const days = Math.floor((Date.now() - new Date(game.lastPlayedAt).getTime()) / 86_400_000);
-  if (days <= 0) return "Played today";
-  if (days === 1) return "Played yesterday";
-  if (days < 30) return `Last played ${days} days ago`;
+  if (days <= 0) return "Heute gespielt";
+  if (days === 1) return "Gestern gespielt";
+  if (days < 30) return `Zuletzt vor ${days} Tagen gespielt`;
   if (days < 365) {
     const months = Math.round(days / 30);
-    return `Last played ${months} ${months === 1 ? "month" : "months"} ago`;
+    return `Zuletzt vor ${months} ${months === 1 ? "Monat" : "Monaten"} gespielt`;
   }
-  return `Last played ${new Date(game.lastPlayedAt).toLocaleDateString()}`;
+  return `Zuletzt am ${new Date(game.lastPlayedAt).toLocaleDateString("de-DE")} gespielt`;
 }
 
 /** Your own past decisions on this game. Only yours: what the others think is tonight's question. */
 function yourHistory(game: Game): string | null {
   const { likes, total } = game.yourVotes;
   if (total === 0) return null;
-  if (total === 1) return likes === 1 ? "You liked this last time" : "You passed on this last time";
-  if (likes === 0) return `You passed on this all ${total} times`;
-  if (likes === total) return `You picked this all ${total} times`;
-  return `You picked this ${likes} of ${total} times`;
+  if (total === 1) return likes === 1 ? "Letztes Mal wolltest du" : "Letztes Mal wolltest du nicht";
+  if (likes === 0) return `Alle ${total} Male abgelehnt`;
+  if (likes === total) return `Alle ${total} Male gewollt`;
+  return `${likes} von ${total} Malen gewollt`;
 }
 
 export default function GameCard({
@@ -100,8 +101,8 @@ export default function GameCard({
       </div>
       <div className="card-scrim" />
 
-      <div className={`stamp stamp-like ${stamp === "right" ? "is-on" : ""}`}>LIKE</div>
-      <div className={`stamp stamp-nope ${stamp === "left" ? "is-on" : ""}`}>NOPE</div>
+      <div className={`stamp stamp-like ${stamp === "right" ? "is-on" : ""}`}>JA</div>
+      <div className={`stamp stamp-nope ${stamp === "left" ? "is-on" : ""}`}>NEIN</div>
 
       <div className="card-body">
         <h2 className="card-title">
@@ -113,16 +114,18 @@ export default function GameCard({
           {game.bestPlayers.length > 0 ? (
             <span className={`best-pill ${isIdeal ? "is-ideal" : ""}`}>
               {isIdeal ? <IconSparkle /> : <IconUsers />}
-              Best with {formatCounts(game.bestPlayers)}
+              Am besten zu {formatCounts(game.bestPlayers)}
             </span>
           ) : (
             <span className="best-pill">
               <IconUsers />
-              No player rating yet
+              Noch keine Spielerwertung
             </span>
           )}
-          {isIdeal && <span className="ideal-note">ideal tonight</span>}
+          {isIdeal && <span className="ideal-note">perfekt für heute</span>}
         </div>
+
+        {game.summary && <p className="card-summary">{game.summary}</p>}
 
         <div className="card-stats">
           <span>{playerRange(game)}</span>
@@ -131,14 +134,15 @@ export default function GameCard({
           <i className="sep" />
           {game.weight !== null ? (
             <span>
-              Weight <span className={`weight-value ${weightClass(game.weight)}`}>{game.weight.toFixed(1)}</span>
+              Komplexität <span className={`weight-value ${weightClass(game.weight)}`}>{decimal(game.weight)}</span>
             </span>
           ) : (
-            <span>Weight ?</span>
+            <span>Komplexität ?</span>
           )}
         </div>
 
-        {tags.length > 0 && (
+        {/* The summary says what the tags only hint at, in German; both would crowd the card. */}
+        {!game.summary && tags.length > 0 && (
           <div className="card-tags">
             {tags.map((tag) => (
               <span className="tag" key={tag}>

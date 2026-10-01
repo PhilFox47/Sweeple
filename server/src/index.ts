@@ -61,7 +61,7 @@ await app.register(fastifyStatic, {
 
 app.setNotFoundHandler((request, reply) => {
   if (request.raw.url?.startsWith("/api")) {
-    reply.code(404).send({ error: "Not found" });
+    reply.code(404).send({ error: "Nicht gefunden" });
     return;
   }
   reply.sendFile("index.html");

@@ -5,9 +5,9 @@ import Avatar from "../components/Avatar";
 type Sort = "least" | "most" | "votes";
 
 const SORTS: { value: Sort; label: string }[] = [
-  { value: "least", label: "Least picked" },
-  { value: "most", label: "Most picked" },
-  { value: "votes", label: "Most votes" },
+  { value: "least", label: "Am wenigsten gewollt" },
+  { value: "most", label: "Am meisten gewollt" },
+  { value: "votes", label: "Meiste Stimmen" },
 ];
 
 const pct = (ratio: number) => `${Math.round(ratio * 100)}%`;
@@ -53,7 +53,7 @@ export default function Stats({ user, refreshToken }: { user: CurrentUser; refre
       setData(await api.stats(ids));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the picks");
+      setError(err instanceof Error ? err.message : "Die Statistik konnte nicht geladen werden");
     } finally {
       setLoading(false);
     }
@@ -75,9 +75,9 @@ export default function Stats({ user, refreshToken }: { user: CurrentUser; refre
     <div className="scroll-area stats-page">
       {user.isAdmin && (
         <section className="panel">
-          <h3>Whose picks?</h3>
+          <h3>Wessen Stimmen?</h3>
           <p className="panel-hint">
-            Pick more than one to see them added up — the games the whole group keeps turning down.
+            Wähle mehrere, um sie zusammenzuzählen — so siehst du, was die ganze Gruppe immer wieder ablehnt.
           </p>
           <div className="chip-list">
             {everyone.map((p) => (
@@ -88,11 +88,11 @@ export default function Stats({ user, refreshToken }: { user: CurrentUser; refre
               >
                 <Avatar name={p.displayName} src={p.avatar} isAdmin={p.isAdmin} className="avatar-xs" />
                 {p.displayName}
-                {p.id === user.id && <span className="chip-tag">you</span>}
+                {p.id === user.id && <span className="chip-tag">du</span>}
               </button>
             ))}
           </div>
-          {selected.length === 0 && <p className="panel-hint">Nobody selected.</p>}
+          {selected.length === 0 && <p className="panel-hint">Niemand ausgewählt.</p>}
         </section>
       )}
 
@@ -100,15 +100,15 @@ export default function Stats({ user, refreshToken }: { user: CurrentUser; refre
         <div className="stats-summary">
           <div className="stat-tile">
             <span className="stat-value">{pct(data.summary.ratio ?? 0)}</span>
-            <span className="stat-label">picked</span>
+            <span className="stat-label">gewollt</span>
           </div>
           <div className="stat-tile">
             <span className="stat-value">{data.summary.votes}</span>
-            <span className="stat-label">{data.summary.votes === 1 ? "vote" : "votes"}</span>
+            <span className="stat-label">{data.summary.votes === 1 ? "Stimme" : "Stimmen"}</span>
           </div>
           <div className="stat-tile">
             <span className="stat-value">{data.summary.games}</span>
-            <span className="stat-label">games seen</span>
+            <span className="stat-label">Spiele gesehen</span>
           </div>
         </div>
       )}
@@ -125,13 +125,13 @@ export default function Stats({ user, refreshToken }: { user: CurrentUser; refre
         ))}
       </div>
 
-      {loading && !data && <p className="panel-hint">Counting…</p>}
+      {loading && !data && <p className="panel-hint">Wird gezählt…</p>}
       {error && <div className="form-error">{error}</div>}
 
       {data && games.length === 0 && !loading && (
         <div className="empty-state">
           <div className="empty-emoji">🗳️</div>
-          <p>No picks recorded yet. Swipe through a round and they will show up here.</p>
+          <p>Noch keine Stimmen. Swipe eine Runde durch, dann tauchen sie hier auf.</p>
         </div>
       )}
 
@@ -146,9 +146,9 @@ export default function Stats({ user, refreshToken }: { user: CurrentUser; refre
             <div className="stat-meta">
               <span className="stat-name">{game.name}</span>
               <span className="stat-sub">
-                <span className={`rate ${rateClass(game.ratio)}`}>{pct(game.ratio)} picked</span>
+                <span className={`rate ${rateClass(game.ratio)}`}>{pct(game.ratio)} gewollt</span>
                 <span className="rate-total">
-                  {game.likes} of {game.total} {game.total === 1 ? "vote" : "votes"}
+                  {game.likes} von {game.total} {game.total === 1 ? "Stimme" : "Stimmen"}
                 </span>
               </span>
               {showBreakdown && (

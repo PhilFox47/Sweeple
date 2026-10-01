@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type CurrentUser, type Match, type MatchKind, type MatchThreshold, type Round } from "./api";
+import { api, SYNC_STOPPED, type CurrentUser, type Match, type MatchKind, type MatchThreshold, type Round } from "./api";
 import Toasts, { type Toast } from "./components/Toasts";
 import Avatar from "./components/Avatar";
 import { IconCards, IconChart, IconHeart, IconSettings } from "./components/icons";
@@ -91,13 +91,13 @@ export default function App() {
         });
         // Lowering the bar can make several games soft matches in one go. One toast, not five.
         if (news.length > 2) {
-          pushToast("match", `${news.length} new matches — have a look 🎉`);
+          pushToast("match", `${news.length} neue Matches — schau mal rein 🎉`);
         } else {
           for (const m of news) {
             if (m.kind === "full") {
-              pushToast("match", seen.has(m.id) ? `Everyone's in on "${m.name}" now 🎉` : `It's a match — "${m.name}" 🎉`);
+              pushToast("match", seen.has(m.id) ? `Jetzt sind alle dabei: „${m.name}“ 🎉` : `Match — „${m.name}“ 🎉`);
             } else {
-              pushToast("match", `Soft match — ${m.likes} of ${bar.players} liked "${m.name}"`);
+              pushToast("match", `Mehrheits-Match — ${m.likes} von ${bar.players} wollen „${m.name}“`);
             }
           }
         }
@@ -143,11 +143,11 @@ export default function App() {
         setSyncSignal((n) => n + 1);
         setLibraryRefresh((n) => n + 1);
         if (event.status === "success") {
-          pushToast("info", `Synced — ${event.gamesAdded} added, ${event.gamesUpdated} updated.`);
-        } else if (event.error === "Sync stopped") {
-          pushToast("info", "Sync stopped.");
+          pushToast("info", `Abgeglichen — ${event.gamesAdded} neu, ${event.gamesUpdated} aktualisiert.`);
+        } else if (event.error === SYNC_STOPPED) {
+          pushToast("info", "Abgleich gestoppt.");
         } else {
-          pushToast("error", `Sync failed: ${event.error}`);
+          pushToast("error", `Abgleich fehlgeschlagen: ${event.error}`);
         }
       }
     },
@@ -220,7 +220,7 @@ export default function App() {
           <span className="brand-mark">🎲</span>
           Sweeple
         </h1>
-        <button className="header-user" onClick={handleSignOut} aria-label={`Signed in as ${user.displayName}. Switch profile`}>
+        <button className="header-user" onClick={handleSignOut} aria-label={`Angemeldet als ${user.displayName}. Profil wechseln`}>
           <Avatar name={user.displayName} src={user.avatar} isAdmin={user.isAdmin} />
         </button>
       </header>
@@ -228,16 +228,16 @@ export default function App() {
       <div className={`round-strip ${round ? "" : "round-strip-idle"}`}>
         <i className="round-dot" />
         {round === undefined ? (
-          <span>Loading round…</span>
+          <span>Runde wird geladen…</span>
         ) : round ? (
           <span>
-            <strong>{round.playerCount}</strong> playing ·{" "}
+            <strong>{round.playerCount}</strong> spielen ·{" "}
             {round.players.map((p) => p.displayName).join(", ")}
           </span>
         ) : (
-          <span>{user.isAdmin ? "No round yet — start one in Settings" : "Waiting for Phil or Leo to start a round"}</span>
+          <span>{user.isAdmin ? "Noch keine Runde — starte eine in den Einstellungen" : "Warte, bis Phil oder Leo eine Runde starten"}</span>
         )}
-        {!live && <span className="live-tag" title="No live connection — checking for matches every few seconds">checking</span>}
+        {!live && <span className="live-tag" title="Keine Live-Verbindung — Matches werden alle paar Sekunden abgefragt">prüft</span>}
       </div>
 
       <main className="app-main">
@@ -247,7 +247,7 @@ export default function App() {
             <Matches matches={matches} threshold={threshold} onChanged={loadMatches} />
             <div className="bgg-credit">
               <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
-                Powered by BGG
+                Daten von BGG
               </a>
             </div>
           </div>
@@ -269,7 +269,7 @@ export default function App() {
             />
             <div className="bgg-credit">
               <a href="https://boardgamegeek.com" target="_blank" rel="noreferrer">
-                Powered by BGG
+                Daten von BGG
               </a>
             </div>
           </div>
@@ -279,7 +279,7 @@ export default function App() {
       <nav className="tab-bar">
         <button className={tab === "swipe" ? "tab-active" : ""} onClick={() => setTab("swipe")}>
           <IconCards />
-          Swipe
+          Swipen
         </button>
         <button className={tab === "matches" ? "tab-active" : ""} onClick={() => setTab("matches")}>
           <span className="tab-icon">
@@ -294,12 +294,12 @@ export default function App() {
         </button>
         <button className={tab === "stats" ? "tab-active" : ""} onClick={() => setTab("stats")}>
           <IconChart />
-          Picks
+          Statistik
         </button>
         {user.isAdmin && (
           <button className={tab === "settings" ? "tab-active" : ""} onClick={() => setTab("settings")}>
             <IconSettings />
-            Settings
+            Einstellungen
           </button>
         )}
       </nav>

@@ -14,20 +14,20 @@ export default async function roundRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const playerIds = request.body?.playerIds;
       if (!Array.isArray(playerIds) || playerIds.length === 0) {
-        return reply.code(400).send({ error: "Pick at least one player for the round." });
+        return reply.code(400).send({ error: "Wähle mindestens eine Person für die Runde." });
       }
       try {
         const round = startRound(playerIds.map(Number));
         broadcast({ type: "round-changed" });
         return { round };
       } catch (err) {
-        return reply.code(400).send({ error: err instanceof Error ? err.message : "Could not start the round." });
+        return reply.code(400).send({ error: err instanceof Error ? err.message : "Die Runde konnte nicht gestartet werden." });
       }
     }
   );
 
   app.post("/api/round/reset", { preHandler: [authenticate, requireAdmin] }, async (_request, reply) => {
-    if (!getActiveRound()) return reply.code(400).send({ error: "No round is running." });
+    if (!getActiveRound()) return reply.code(400).send({ error: "Es läuft keine Runde." });
     const cleared = clearRoundProgress();
     broadcast({ type: "round-changed" });
     return { ok: true, ...cleared };

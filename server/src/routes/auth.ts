@@ -43,14 +43,14 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post<{ Body: { userId: number } }>("/api/login", async (request, reply) => {
     const userId = Number(request.body?.userId);
-    if (!Number.isFinite(userId)) return reply.code(400).send({ error: "Pick a profile." });
+    if (!Number.isFinite(userId)) return reply.code(400).send({ error: "Wähle ein Profil." });
 
     const user = db
       .prepare("SELECT id, username, display_name as displayName, role, avatar_version FROM users WHERE id = ?")
       .get(userId) as
       | { id: number; username: string; displayName: string; role: string; avatar_version: number }
       | undefined;
-    if (!user) return reply.code(404).send({ error: "That profile no longer exists." });
+    if (!user) return reply.code(404).send({ error: "Dieses Profil gibt es nicht mehr." });
 
     const { token, expiresAt } = createSession(user.id);
     setSessionCookie(reply, token, expiresAt);
@@ -89,7 +89,7 @@ export default async function authRoutes(app: FastifyInstance) {
    */
   app.get<{ Params: { id: string } }>("/api/users/:id/avatar", async (request, reply) => {
     const image = readAvatar(Number(request.params.id));
-    if (!image) return reply.code(404).send({ error: "No picture." });
+    if (!image) return reply.code(404).send({ error: "Kein Foto." });
     // The URL carries a version, so this exact URL can be cached hard.
     return reply.type(image.type).header("Cache-Control", "public, max-age=31536000, immutable").send(image.bytes);
   });
@@ -100,7 +100,7 @@ export default async function authRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const id = Number(request.params.id);
       if (id !== request.user!.id && request.user!.role !== "core") {
-        return reply.code(403).send({ error: "You can only change your own picture." });
+        return reply.code(403).send({ error: "Du kannst nur dein eigenes Foto ändern." });
       }
       const decoded = decodeDataUrl(request.body?.dataUrl);
       if ("error" in decoded) return reply.code(400).send({ error: decoded.error });
@@ -108,7 +108,7 @@ export default async function authRoutes(app: FastifyInstance) {
       const changed = db
         .prepare("UPDATE users SET avatar = ?, avatar_type = ?, avatar_version = avatar_version + 1 WHERE id = ?")
         .run(decoded.bytes, decoded.type, id).changes;
-      if (changed === 0) return reply.code(404).send({ error: "No such profile." });
+      if (changed === 0) return reply.code(404).send({ error: "Dieses Profil gibt es nicht." });
 
       const version = (db.prepare("SELECT avatar_version FROM users WHERE id = ?").get(id) as { avatar_version: number })
         .avatar_version;
@@ -123,7 +123,7 @@ export default async function authRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const id = Number(request.params.id);
       if (id !== request.user!.id && request.user!.role !== "core") {
-        return reply.code(403).send({ error: "You can only change your own picture." });
+        return reply.code(403).send({ error: "Du kannst nur dein eigenes Foto ändern." });
       }
       db.prepare("UPDATE users SET avatar = NULL, avatar_type = NULL, avatar_version = 0 WHERE id = ?").run(id);
       broadcast({ type: "players-changed" });
@@ -140,8 +140,8 @@ export default async function authRoutes(app: FastifyInstance) {
     { preHandler: [authenticate, requireAdmin] },
     async (request, reply) => {
       const displayName = request.body?.displayName?.trim();
-      if (!displayName) return reply.code(400).send({ error: "Give the profile a name." });
-      if (displayName.length > 40) return reply.code(400).send({ error: "That name is too long." });
+      if (!displayName) return reply.code(400).send({ error: "Das Profil braucht einen Namen." });
+      if (displayName.length > 40) return reply.code(400).send({ error: "Der Name ist zu lang." });
 
       // Usernames are an internal handle only; derive one that cannot collide.
       const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "player";
@@ -166,12 +166,12 @@ export default async function authRoutes(app: FastifyInstance) {
       const user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(id) as
         | { id: number; role: string }
         | undefined;
-      if (!user) return reply.code(404).send({ error: "No such profile." });
-      if (user.role === "core") return reply.code(400).send({ error: "The permanent profiles cannot be removed." });
+      if (!user) return reply.code(404).send({ error: "Dieses Profil gibt es nicht." });
+      if (user.role === "core") return reply.code(400).send({ error: "Die festen Profile lassen sich nicht löschen." });
 
       const round = getActiveRound();
       if (round?.players.some((p) => p.id === id)) {
-        return reply.code(400).send({ error: "That profile is in the running round. Start a new round first." });
+        return reply.code(400).send({ error: "Dieses Profil spielt in der laufenden Runde mit. Starte zuerst eine neue Runde." });
       }
 
       // Swipes, votes and sessions cascade; past matches stay as shared history.

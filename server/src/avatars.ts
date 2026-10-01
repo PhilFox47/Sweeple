@@ -16,16 +16,16 @@ export interface DecodedImage {
 
 /** Pulls the bytes out of a `data:image/jpeg;base64,…` URL, refusing anything else. */
 export function decodeDataUrl(dataUrl: unknown): DecodedImage | { error: string } {
-  if (typeof dataUrl !== "string") return { error: "Send the image as a data URL." };
+  if (typeof dataUrl !== "string") return { error: "Das Bild muss als Data-URL kommen." };
   const match = /^data:([a-z]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i.exec(dataUrl.trim());
-  if (!match) return { error: "That does not look like an image." };
+  if (!match) return { error: "Das sieht nicht nach einem Bild aus." };
 
   const type = match[1].toLowerCase();
-  if (!ALLOWED.has(type)) return { error: "Use a JPEG, PNG or WebP image." };
+  if (!ALLOWED.has(type)) return { error: "Bitte ein JPEG-, PNG- oder WebP-Bild." };
 
   const bytes = Buffer.from(match[2], "base64");
-  if (bytes.length === 0) return { error: "That image is empty." };
-  if (bytes.length > MAX_BYTES) return { error: "That image is too large." };
+  if (bytes.length === 0) return { error: "Das Bild ist leer." };
+  if (bytes.length > MAX_BYTES) return { error: "Das Bild ist zu groß." };
   return { bytes, type };
 }
 

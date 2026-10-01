@@ -32,31 +32,31 @@ export default function FilterSheet({
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-label="Filters">
+      <div className="sheet" role="dialog" aria-label="Filter">
         <div className="sheet-grip" />
         <div className="sheet-header">
-          <h3>Filters</h3>
-          <button className="btn btn-quiet" onClick={onClose} aria-label="Close">
+          <h3>Filter</h3>
+          <button className="btn btn-quiet" onClick={onClose} aria-label="Schließen">
             <IconX />
           </button>
         </div>
 
         <div className="sheet-body">
           <div className="field">
-            <label htmlFor="f-players">Player count</label>
+            <label htmlFor="f-players">Spielerzahl</label>
             <input
               id="f-players"
               type="number"
               inputMode="numeric"
               min={1}
-              placeholder={roundPlayerCount ? `${roundPlayerCount} (this round)` : "Any"}
+              placeholder={roundPlayerCount ? `${roundPlayerCount} (diese Runde)` : "Egal"}
               value={draft.playerCount ?? ""}
               onChange={(e) => setDraft({ ...draft, playerCount: num(e.target.value) })}
             />
           </div>
 
           <div className="field">
-            <label>Weight</label>
+            <label>Komplexität (1–5)</label>
             <div className="field-pair">
               <input
                 type="number"
@@ -64,7 +64,7 @@ export default function FilterSheet({
                 step={0.1}
                 min={1}
                 max={5}
-                placeholder="min"
+                placeholder="von"
                 value={draft.weightMin ?? ""}
                 onChange={(e) => setDraft({ ...draft, weightMin: num(e.target.value) })}
               />
@@ -74,7 +74,7 @@ export default function FilterSheet({
                 step={0.1}
                 min={1}
                 max={5}
-                placeholder="max"
+                placeholder="bis"
                 value={draft.weightMax ?? ""}
                 onChange={(e) => setDraft({ ...draft, weightMax: num(e.target.value) })}
               />
@@ -82,44 +82,44 @@ export default function FilterSheet({
           </div>
 
           <div className="field">
-            <label htmlFor="f-time">Max playtime (minutes)</label>
+            <label htmlFor="f-time">Höchstens … Minuten Spieldauer</label>
             <input
               id="f-time"
               type="number"
               inputMode="numeric"
               min={1}
-              placeholder="Any"
+              placeholder="Egal"
               value={draft.maxPlaytime ?? ""}
               onChange={(e) => setDraft({ ...draft, maxPlaytime: num(e.target.value) })}
             />
           </div>
 
           <div className="field">
-            <label htmlFor="f-stale">Not played in the last … days</label>
+            <label htmlFor="f-stale">Seit … Tagen nicht gespielt</label>
             <input
               id="f-stale"
               type="number"
               inputMode="numeric"
               min={1}
-              placeholder="Any"
+              placeholder="Egal"
               value={draft.notPlayedInDays ?? ""}
               onChange={(e) => setDraft({ ...draft, notPlayedInDays: num(e.target.value) })}
             />
           </div>
 
           <div className="switch-row">
-            <span>Include expansions</span>
+            <span>Erweiterungen zeigen</span>
             <button
               className={`chip ${draft.includeExpansions ? "chip-active" : ""}`}
               onClick={() => setDraft({ ...draft, includeExpansions: !draft.includeExpansions })}
             >
-              {draft.includeExpansions ? "On" : "Off"}
+              {draft.includeExpansions ? "An" : "Aus"}
             </button>
           </div>
 
           {categories.length > 0 && (
             <div className="field">
-              <label>Categories</label>
+              <label>Kategorien</label>
               <div className="chip-list">
                 {categories.map((cat) => (
                   <button
@@ -136,7 +136,7 @@ export default function FilterSheet({
 
           {mechanics.length > 0 && (
             <div className="field">
-              <label>Mechanics</label>
+              <label>Mechaniken</label>
               <div className="chip-list">
                 {mechanics.map((mech) => (
                   <button
@@ -157,7 +157,7 @@ export default function FilterSheet({
             className="btn btn-ghost"
             onClick={() => setDraft(roundPlayerCount ? { playerCount: roundPlayerCount } : {})}
           >
-            Clear
+            Zurücksetzen
           </button>
           <button
             className="btn btn-primary"
@@ -166,7 +166,7 @@ export default function FilterSheet({
               onClose();
             }}
           >
-            Show games
+            Spiele zeigen
           </button>
         </div>
       </div>

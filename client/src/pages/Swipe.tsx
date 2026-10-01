@@ -51,7 +51,7 @@ export default function Swipe({
       setDeck(games);
     } catch (err) {
       if (id !== requestId.current) return;
-      setError(err instanceof Error ? err.message : "Failed to load games");
+      setError(err instanceof Error ? err.message : "Spiele konnten nicht geladen werden");
     } finally {
       if (id === requestId.current) setLoading(false);
     }
@@ -95,7 +95,7 @@ export default function Swipe({
       await api.swipe(game.id, decision);
       await redealBelowTop(filtersRef.current);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to record swipe");
+      setError(err instanceof Error ? err.message : "Die Entscheidung wurde nicht gespeichert");
     }
   }, [redealBelowTop]);
 
@@ -110,7 +110,7 @@ export default function Swipe({
   }
 
   async function handleReset() {
-    if (!confirm("Start your swipes over? Games you already decided on come back into the deck.")) return;
+    if (!confirm("Nochmal von vorn? Alle Spiele, über die du heute schon entschieden hast, kommen zurück in den Stapel.")) return;
     await api.resetSwipes();
     loadDeck(effectiveFilters);
   }
@@ -124,12 +124,12 @@ export default function Swipe({
       <div className="swipe-toolbar">
         <button className="btn btn-ghost" onClick={() => setShowFilters(true)}>
           <IconSliders />
-          Filters
+          Filter
         </button>
         <button className="btn btn-quiet" onClick={handleReset}>
-          Start over
+          Von vorn
         </button>
-        {!loading && deck.length > 0 && <span className="deck-count">{deck.length} left</span>}
+        {!loading && deck.length > 0 && <span className="deck-count">{deck.length} übrig</span>}
       </div>
 
       {error && <div className="form-error">{error}</div>}
@@ -140,8 +140,8 @@ export default function Swipe({
         {!loading && round !== undefined && deck.length === 0 && (
           <div className="empty-state">
             <div className="empty-emoji">🎲</div>
-            <h3>Nothing left to swipe</h3>
-            <p>Adjust the filters, start over, or sync your collection from Settings.</p>
+            <h3>Nichts mehr zum Swipen</h3>
+            <p>Filter anpassen, von vorn anfangen oder in den Einstellungen die Sammlung abgleichen.</p>
           </div>
         )}
 
@@ -164,7 +164,7 @@ export default function Swipe({
           className="circle-btn nope"
           onClick={() => swipeTop("left")}
           disabled={loading || deck.length === 0}
-          aria-label="Not tonight"
+          aria-label="Heute nicht"
         >
           <IconX />
         </button>
@@ -172,7 +172,7 @@ export default function Swipe({
           className="circle-btn like big"
           onClick={() => swipeTop("right")}
           disabled={loading || deck.length === 0}
-          aria-label="Would play"
+          aria-label="Würde ich spielen"
         >
           <IconHeartFilled />
         </button>

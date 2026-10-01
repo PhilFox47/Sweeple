@@ -11,6 +11,7 @@ services:
       BGG_COOKIE: ${BGG_COOKIE:-}
       BGG_USER_AGENT: ${BGG_USER_AGENT:-}
       BGG_TOKEN: ${BGG_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - sweeple-data:/data
 

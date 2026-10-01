@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type ExpansionMode, type GameRating, type LibraryGame } from "../api";
+import SummaryEditor from "./SummaryEditor";
 
 function range(min: number | null, max: number | null): string | null {
   if (!min && !max) return null;
-  if (min && max && min !== max) return `${min}–${max} players`;
-  return `${min ?? max} players`;
+  if (min && max && min !== max) return `${min}–${max} Spieler`;
+  return `${min ?? max} Spieler`;
 }
 
 const pct = (ratio: number) => `${Math.round(ratio * 100)}%`;
@@ -20,12 +21,12 @@ function rateClass(ratio: number): string {
 }
 
 function PickRating({ rating }: { rating: GameRating }) {
-  if (rating.total === 0) return <span className="library-rating is-empty">No votes yet</span>;
+  if (rating.total === 0) return <span className="library-rating is-empty">Noch keine Stimmen</span>;
   return (
     <span className="library-rating">
-      <span className={`rate ${rateClass(rating.ratio ?? 0)}`}>{pct(rating.ratio ?? 0)} picked</span>
+      <span className={`rate ${rateClass(rating.ratio ?? 0)}`}>{pct(rating.ratio ?? 0)} gewollt</span>
       <span className="rate-total">
-        {rating.total} {rating.total === 1 ? "vote" : "votes"}
+        {rating.total} {rating.total === 1 ? "Stimme" : "Stimmen"}
       </span>
       {rating.byPlayer.map((p) => (
         <span className="rate-player" key={p.id}>
@@ -58,6 +59,7 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<number | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
         setGames(games);
         setError(null);
       })
-      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Could not load the library"))
+      .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Die Bibliothek konnte nicht geladen werden"))
       .finally(() => !cancelled && setLoaded(true));
     return () => {
       cancelled = true;
@@ -80,7 +82,7 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
 
   const groups = useMemo<Group[]>(() => {
     if (search) {
-      return [{ key: "search", title: "Search results", games: games.filter((g) => g.name.toLowerCase().includes(search)) }];
+      return [{ key: "search", title: "Suchergebnisse", games: games.filter((g) => g.name.toLowerCase().includes(search)) }];
     }
 
     const out: Group[] = [];
@@ -93,8 +95,8 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
     if (unpopular.length) {
       out.push({
         key: "unpopular",
-        title: "Rarely picked",
-        hint: `turned down most of the time`,
+        title: "Selten gewollt",
+        hint: "meistens abgelehnt",
         games: unpopular,
       });
     }
@@ -108,18 +110,18 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
     }
     for (const [title, list] of [...bySeries].sort((a, b) => a[0].localeCompare(b[0]))) {
       const inDeck = list.filter((g) => !g.hidden).length;
-      out.push({ key: `series:${title}`, title, hint: `${inDeck} of ${list.length} in the deck`, games: list });
+      out.push({ key: `series:${title}`, title, hint: `${inDeck} von ${list.length} im Stapel`, games: list });
     }
 
     const loose = games.filter((g) => !g.series);
     const expansions = loose.filter((g) => g.isExpansion || g.mode !== "auto");
     if (expansions.length) {
-      out.push({ key: "expansions", title: "Expansions", hint: "Flagged by BoardGameGeek", games: expansions });
+      out.push({ key: "expansions", title: "Erweiterungen", hint: "laut BoardGameGeek", games: expansions });
     }
 
     const rest = loose.filter((g) => !expansions.includes(g));
     if (rest.length) {
-      out.push({ key: "rest", title: "Everything else", hint: `${rest.length} games`, games: showAll ? rest : [] });
+      out.push({ key: "rest", title: "Alles andere", hint: `${rest.length} Spiele`, games: showAll ? rest : [] });
     }
     return out;
   }, [games, search, showAll]);
@@ -138,7 +140,7 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
       await api.setGameVisibility(game.id, mode);
     } catch (err) {
       setGames((prev) => prev.map((g) => (g.id === game.id ? game : g)));
-      setError(err instanceof Error ? err.message : "Could not save that");
+      setError(err instanceof Error ? err.message : "Das konnte nicht gespeichert werden");
     } finally {
       setPending(null);
     }
@@ -148,23 +150,24 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
 
   return (
     <section className="panel">
-      <h3>What shows up when swiping</h3>
+      <h3>Was im Stapel landet</h3>
       <p className="panel-hint">
-        Hide the boxes you never want dealt: expansions that only add to a base game, and the extra
-        versions of a series like Villainous or Dice Throne — keep one, hide the rest. Your choices
-        are kept when the library is synced again.
+        Blende aus, was nie ausgeteilt werden soll: Erweiterungen, die nur ein Grundspiel ergänzen,
+        und die weiteren Boxen einer Reihe wie Villainous oder Dice Throne — eine behalten, den Rest
+        ausblenden. Tippe auf ein Spiel, um seine Kurzbeschreibung zu bearbeiten. Deine Auswahl
+        bleibt beim nächsten Abgleich erhalten.
       </p>
 
       <div className="inline-form">
-        <input type="text" placeholder="Search games" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input type="text" placeholder="Spiele suchen" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
 
       {loaded && games.length === 0 && !error && (
-        <p className="panel-hint">The library is empty. Sync or import to fill it.</p>
+        <p className="panel-hint">Die Bibliothek ist leer. Gleiche mit BGG ab oder importiere deine Sammlung.</p>
       )}
       {games.length > 0 && (
         <p className="panel-hint library-summary">
-          {games.length - hiddenCount} of {games.length} games can show up when swiping.
+          {games.length - hiddenCount} von {games.length} Spielen können ausgeteilt werden.
         </p>
       )}
 
@@ -175,7 +178,7 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
             {group.hint && <span className="library-group-hint">{group.hint}</span>}
             {group.key === "rest" && (
               <button className="btn-quiet library-toggle" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? "Hide" : "Show"}
+                {showAll ? "Einklappen" : "Zeigen"}
               </button>
             )}
           </div>
@@ -187,39 +190,58 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
               ) : (
                 <div className="library-thumb library-thumb-empty" />
               )}
-              <div className="library-meta">
-                <span className="library-name">{game.name}</span>
+              <button
+                className="library-meta"
+                onClick={() => setEditing((id) => (id === game.id ? null : game.id))}
+                aria-expanded={editing === game.id}
+              >
+                <span className="library-name">
+                  {game.name}
+                  {!game.summary && <span className="no-summary" title="Keine Kurzbeschreibung"> · ohne Text</span>}
+                </span>
                 <span className="library-sub">
-                  {[range(game.minPlayers, game.maxPlayers), game.isExpansion ? "BGG: expansion" : null]
+                  {[range(game.minPlayers, game.maxPlayers), game.isExpansion ? "BGG: Erweiterung" : null]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
                 <PickRating rating={game.rating} />
-              </div>
+              </button>
               <div className="segmented">
                 <button
                   className={`segment ${game.hidden ? "" : "segment-active"}`}
                   disabled={pending === game.id}
                   onClick={() => setMode(game, "standalone")}
                 >
-                  In deck
+                  Im Stapel
                 </button>
                 <button
                   className={`segment ${game.hidden ? "segment-active segment-off" : ""}`}
                   disabled={pending === game.id}
                   onClick={() => setMode(game, "hidden")}
                 >
-                  Hidden
+                  Ausgeblendet
                 </button>
               </div>
+              {editing === game.id && (
+                <SummaryEditor
+                  game={game}
+                  onSaved={(summary) =>
+                    setGames((prev) =>
+                      prev.map((g) =>
+                        g.id === game.id ? { ...g, summary, summarySource: summary ? "manual" : null } : g
+                      )
+                    )
+                  }
+                />
+              )}
             </div>
           ))}
 
-          {group.games.length === 0 && group.key !== "rest" && <p className="panel-hint">Nothing here.</p>}
+          {group.games.length === 0 && group.key !== "rest" && <p className="panel-hint">Nichts hier.</p>}
         </div>
       ))}
 
-      {search && groups[0]?.games.length === 0 && <p className="panel-hint">No game matches “{query}”.</p>}
+      {search && groups[0]?.games.length === 0 && <p className="panel-hint">Kein Spiel passt zu „{query}“.</p>}
 
       {error && <div className="form-error">{error}</div>}
     </section>

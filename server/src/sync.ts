@@ -2,6 +2,7 @@ import { db } from "./db.js";
 import { fetchCollection, fetchGameDetails, fetchPlayStats, isCancellation } from "./bgg.js";
 import { applyCollection, applyDetails, applyPlays } from "./store.js";
 import { broadcast } from "./ws.js";
+import { generateMissingSummaries } from "./summaries.js";
 
 let syncInProgress = false;
 let controller: AbortController | null = null;
@@ -26,7 +27,7 @@ export async function runSync(): Promise<void> {
   if (!username) {
     syncInProgress = false;
     controller = null;
-    throw new Error("BGG_USERNAME is not configured");
+    throw new Error("BGG_USERNAME ist nicht eingerichtet.");
   }
 
   const options = {
@@ -43,12 +44,12 @@ export async function runSync(): Promise<void> {
   let gamesUpdated = 0;
 
   try {
-    options.onProgress("Requesting your collection from BGG");
+    options.onProgress("Frage die Sammlung bei BGG an");
     const collection = await fetchCollection(username, options);
     if (collection.length === 0) {
       // Rather than trust an empty response and mark the whole library as no longer owned.
       throw new Error(
-        `BGG returned an empty collection for "${username}". Leaving the existing games untouched.`
+        `BGG hat für „${username}“ eine leere Sammlung geliefert. Die vorhandenen Spiele bleiben unverändert.`
       );
     }
     const details = await fetchGameDetails(
@@ -73,9 +74,11 @@ export async function runSync(): Promise<void> {
     ).run(gamesAdded, gamesUpdated, logId);
 
     broadcast({ type: "sync-finished", status: "success", gamesAdded, gamesUpdated });
+    // New games arrive without a summary. Not awaited: the sync is done, this is extra.
+    void generateMissingSummaries();
   } catch (err) {
     const cancelled = isCancellation(err);
-    const message = cancelled ? "Sync stopped" : err instanceof Error ? err.message : String(err);
+    const message = cancelled ? "Abgleich gestoppt" : err instanceof Error ? err.message : String(err);
     db.prepare(
       "UPDATE sync_log SET finished_at = datetime('now'), status = 'error', error = ? WHERE id = ?"
     ).run(message, logId);

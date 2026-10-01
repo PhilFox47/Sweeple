@@ -84,6 +84,13 @@ if (matchesAreUniquePerGameOnly()) {
   console.log("[db] migrated: matches are now unique per game per round");
 }
 
+// BGG's description (English, as fetched) and the short German summary shown on the card. The
+// summary is written by the generator or by hand and never by syncing — summary_source says
+// which, so a generated one can be redone and a hand-written one is never overwritten.
+addColumnIfMissing("games", "description", "TEXT");
+addColumnIfMissing("games", "summary", "TEXT");
+addColumnIfMissing("games", "summary_source", "TEXT");
+
 // Soft matches. Added after the rebuild above, which only carries the columns it knows about.
 addColumnIfMissing("matches", "kind", "TEXT NOT NULL DEFAULT 'full'");
 addColumnIfMissing("matches", "likes", "INTEGER NOT NULL DEFAULT 0");

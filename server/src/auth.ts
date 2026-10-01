@@ -57,7 +57,7 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   const token = request.cookies[SESSION_COOKIE];
   const user = token ? getUserForToken(token) : null;
   if (!user) {
-    reply.code(401).send({ error: "Not authenticated" });
+    reply.code(401).send({ error: "Nicht angemeldet" });
     return;
   }
   request.user = user;
@@ -66,7 +66,7 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
 /** Only the permanent profiles manage rounds, players and syncing. */
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   if (request.user?.role !== "core") {
-    reply.code(403).send({ error: "Only Phil and Leo can change this." });
+    reply.code(403).send({ error: "Das können nur Phil und Leo ändern." });
   }
 }
 
