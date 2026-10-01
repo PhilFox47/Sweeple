@@ -6,7 +6,8 @@ import { OPENING_CARDS, openingHands, weightFor, weightedOrder, type Candidate }
 import { reconcileMatches, recordDeckTotal } from "../matching.js";
 import { activeRoundId, getActiveRound } from "../rounds.js";
 import { ratingsForUser } from "../stats.js";
-import { generateMissingSummaries, setManualSummary, summaryStatus } from "../summaries.js";
+import { displayBlurb } from "../blurbs.js";
+import { setManualSummary, translateMissing, translationStatus } from "../translate.js";
 
 interface GameRow {
   id: number;
@@ -29,6 +30,10 @@ interface GameRow {
   recommended_players: string;
   expansion_mode: string;
   summary: string | null;
+  summary_source: string | null;
+  summary_from: string | null;
+  short_description: string | null;
+  description: string | null;
   num_plays: number;
   last_played_at: string | null;
   is_expansion: number;
@@ -59,7 +64,8 @@ function serializeGame(row: GameRow) {
     lastPlayedAt: row.last_played_at,
     isExpansion: !!row.is_expansion,
     expansionMode: (row.expansion_mode ?? "auto") as "auto" | "hidden" | "standalone",
-    summary: row.summary ?? null,
+    // German when there is a current German version, otherwise BGG's English.
+    summary: displayBlurb(row).text,
   };
 }
 
@@ -245,16 +251,16 @@ export default async function gamesRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get("/api/summaries", { preHandler: [authenticate, requireAdmin] }, async () => summaryStatus());
+  app.get("/api/summaries", { preHandler: [authenticate, requireAdmin] }, async () => translationStatus());
 
-  app.post("/api/summaries/generate", { preHandler: [authenticate, requireAdmin] }, async (_request, reply) => {
-    const status = summaryStatus();
+  app.post("/api/summaries/translate", { preHandler: [authenticate, requireAdmin] }, async (_request, reply) => {
+    const status = translationStatus();
     if (!status.configured) {
-      return reply.code(400).send({ error: "Für automatische Kurzbeschreibungen fehlt ANTHROPIC_API_KEY in der .env." });
+      return reply.code(400).send({ error: `Für Übersetzungen fehlt in der .env: ${status.missing.join(", ")}.` });
     }
-    // Runs in the background; progress arrives as summaries-changed events and via polling.
-    void generateMissingSummaries();
-    return { ...summaryStatus(), running: true };
+    // Runs in the background; Settings polls the status while it does.
+    void translateMissing();
+    return { ...translationStatus(), running: true };
   });
 
   app.put<{ Params: { id: string }; Body: { summary: string | null } }>(

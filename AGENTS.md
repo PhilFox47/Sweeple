@@ -70,11 +70,14 @@ never appear in a repository file, a test fixture, or a commit message. BGG is a
 Cloudflare; the bundled Chromium in `server/src/browser.ts` is the fallback for a tokenless setup
 and is not exercised against real BGG from CI or a sandbox.
 
-**Game summaries come from the Claude API** (`server/src/summaries.ts`), written once per game
-from BGG's `description` and cached in `games.summary`. `summary_source` is `'ai'` or `'manual'`;
-the generator only ever fills `NULL`s, so a hand-written summary is never overwritten. It needs
-`ANTHROPIC_API_KEY` — like `BGG_TOKEN`, only ever in `.env`. To test it without a key or spend,
-point `ANTHROPIC_BASE_URL` at a local mock of the Messages API; the SDK honours it.
+**Card texts come from BGG, not from a model.** The short description is not in the XML API;
+it comes from BGG's JSON API (`api.geekdo.com/api/geekitems`, field `short_description`), one
+request per game, so `short_checked_at` keeps a sync from asking twice. With none, the card
+falls back to the opening of the XML `description` (`server/src/blurbs.ts` decides). Nano-GPT
+only *translates* (`server/src/translate.ts`, OpenAI-style chat completions); each translation
+stores the English it came from in `summary_from` and is redone when BGG's text changes. A
+`'manual'` summary is never overwritten. `NANOGPT_API_KEY`, like `BGG_TOKEN`, lives only in
+`.env`. To test without spending, point `NANOGPT_BASE_URL` and `BGG_JSON_ORIGIN` at local mocks.
 
 **A collection response calls everything a `boardgame`.** Only `/thing` marks expansions. Skip
 the detail step and expansions land in the swipe deck as standalone games.

@@ -141,7 +141,7 @@ export default function GameCard({
           )}
         </div>
 
-        {/* The summary says what the tags only hint at, in German; both would crowd the card. */}
+        {/* The blurb says what the tags only hint at; both would crowd the card. */}
         {!game.summary && tags.length > 0 && (
           <div className="card-tags">
             {tags.map((tag) => (

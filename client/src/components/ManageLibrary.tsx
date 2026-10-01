@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type ExpansionMode, type GameRating, type LibraryGame } from "../api";
 import SummaryEditor from "./SummaryEditor";
 
@@ -61,6 +61,14 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
   const [pending, setPending] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  // After an edit the server decides what shows (hand-written, translation or BGG's English).
+  const reload = useCallback(() => {
+    api
+      .library()
+      .then(({ games }) => setGames(games))
+      .catch((err) => setError(err instanceof Error ? err.message : "Die Bibliothek konnte nicht geladen werden"));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,16 +231,7 @@ export default function ManageLibrary({ refreshToken }: { refreshToken: number }
                 </button>
               </div>
               {editing === game.id && (
-                <SummaryEditor
-                  game={game}
-                  onSaved={(summary) =>
-                    setGames((prev) =>
-                      prev.map((g) =>
-                        g.id === game.id ? { ...g, summary, summarySource: summary ? "manual" : null } : g
-                      )
-                    )
-                  }
-                />
+                <SummaryEditor game={game} onSaved={reload} />
               )}
             </div>
           ))}

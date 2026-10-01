@@ -35,8 +35,12 @@ CREATE TABLE IF NOT EXISTS games (
   last_played_at TEXT,
   is_expansion INTEGER NOT NULL DEFAULT 0,
   description TEXT,
+  short_description TEXT,
+  short_checked_at TEXT,
   summary TEXT,
+  -- 'ai': machine-translated from summary_from. 'manual': written by hand, never replaced.
   summary_source TEXT CHECK (summary_source IN ('ai', 'manual')),
+  summary_from TEXT,
   owned INTEGER NOT NULL DEFAULT 1,
   last_synced_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))

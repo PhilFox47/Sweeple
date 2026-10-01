@@ -1243,6 +1243,26 @@ button.library-meta {
   gap: 0.5rem;
 }
 
+.summary-original {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.summary-original-label {
+  display: inline-block;
+  margin-right: 0.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+
 .summary-editor textarea {
   resize: vertical;
   line-height: 1.4;

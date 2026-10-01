@@ -1,8 +1,8 @@
 import { db } from "./db.js";
-import { fetchCollection, fetchGameDetails, fetchPlayStats, isCancellation } from "./bgg.js";
-import { applyCollection, applyDetails, applyPlays } from "./store.js";
+import { fetchCollection, fetchGameDetails, fetchPlayStats, fetchShortDescriptions, isCancellation } from "./bgg.js";
+import { applyCollection, applyDetails, applyPlays, applyShortDescriptions, gamesNeedingShortDescription } from "./store.js";
 import { broadcast } from "./ws.js";
-import { generateMissingSummaries } from "./summaries.js";
+import { translateMissing } from "./translate.js";
 
 let syncInProgress = false;
 let controller: AbortController | null = null;
@@ -66,6 +66,12 @@ export async function runSync(): Promise<void> {
     const result = applyCollection(collection);
     applyDetails(details);
     applyPlays(playStats);
+
+    // After the collection is applied, so newly added games are in the table to be asked about.
+    // A missing blurb is no reason to fail a sync; a game that could not be asked is retried next time.
+    const blurbs = await fetchShortDescriptions(gamesNeedingShortDescription(), options);
+    applyShortDescriptions(blurbs);
+
     gamesAdded = result.added;
     gamesUpdated = result.updated;
 
@@ -74,8 +80,8 @@ export async function runSync(): Promise<void> {
     ).run(gamesAdded, gamesUpdated, logId);
 
     broadcast({ type: "sync-finished", status: "success", gamesAdded, gamesUpdated });
-    // New games arrive without a summary. Not awaited: the sync is done, this is extra.
-    void generateMissingSummaries();
+    // New or changed English gets its German version. Not awaited: the sync is done, this is extra.
+    void translateMissing();
   } catch (err) {
     const cancelled = isCancellation(err);
     const message = cancelled ? "Abgleich gestoppt" : err instanceof Error ? err.message : String(err);

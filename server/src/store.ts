@@ -139,6 +139,38 @@ export function applyPlays(stats: Map<number, PlayStats>): { updated: number } {
 }
 
 /** Games that still need details from the thing endpoint, in stable order. */
+/**
+ * Games to ask BGG for a short description: never asked, or asked a month ago and BGG had none
+ * then. One request each, so this has to stay a short list on an ordinary sync.
+ */
+export function gamesNeedingShortDescription(): number[] {
+  return (
+    db
+      .prepare(
+        `SELECT bgg_id FROM games
+         WHERE owned = 1
+           AND (short_checked_at IS NULL
+                OR (short_description IS NULL AND short_checked_at < datetime('now', '-30 days')))
+         ORDER BY bgg_id`
+      )
+      .all() as { bgg_id: number }[]
+  ).map((r) => r.bgg_id);
+}
+
+export function applyShortDescriptions(found: Map<number, string | null>): number {
+  const update = db.prepare(
+    "UPDATE games SET short_description = ?, short_checked_at = datetime('now') WHERE bgg_id = ?"
+  );
+  let withText = 0;
+  db.transaction(() => {
+    for (const [bggId, text] of found) {
+      update.run(text, bggId);
+      if (text) withText += 1;
+    }
+  })();
+  return withText;
+}
+
 export function gamesMissingDetails(): number[] {
   return (
     db

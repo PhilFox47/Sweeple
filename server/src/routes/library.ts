@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { authenticate, requireAdmin } from "../auth.js";
 import { db } from "../db.js";
+import { displayBlurb, englishBlurb } from "../blurbs.js";
 import { EMPTY_RATING, gameRatings } from "../stats.js";
 import { broadcast } from "../ws.js";
 
@@ -17,6 +18,9 @@ interface Row {
   expansion_mode: string;
   summary: string | null;
   summary_source: string | null;
+  summary_from: string | null;
+  short_description: string | null;
+  description: string | null;
 }
 
 /** Words used for matching: lower case, punctuation flattened. */
@@ -94,7 +98,7 @@ export default async function libraryRoutes(app: FastifyInstance) {
     const rows = db
       .prepare(
         `SELECT id, name, thumbnail, min_players, max_players, is_expansion, expansion_mode,
-                summary, summary_source
+                summary, summary_source, summary_from, short_description, description
          FROM games
          WHERE owned = 1
          ORDER BY name COLLATE NOCASE`
@@ -115,7 +119,10 @@ export default async function libraryRoutes(app: FastifyInstance) {
         mode: (r.expansion_mode ?? "auto") as Mode,
         series: series.get(r.id) ?? null,
         rating: ratings.get(r.id) ?? EMPTY_RATING,
-        summary: r.summary,
+        // BGG's English, and what the card shows right now — the editor needs both.
+        english: englishBlurb(r),
+        summary: displayBlurb(r).text,
+        summaryLanguage: displayBlurb(r).language,
         summarySource: r.summary_source as "ai" | "manual" | null,
         // What the deck does with it today, once the override is applied.
         hidden: r.expansion_mode === "hidden" || (r.expansion_mode === "auto" && !!r.is_expansion),

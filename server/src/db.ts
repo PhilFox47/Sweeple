@@ -84,12 +84,24 @@ if (matchesAreUniquePerGameOnly()) {
   console.log("[db] migrated: matches are now unique per game per round");
 }
 
-// BGG's description (English, as fetched) and the short German summary shown on the card. The
-// summary is written by the generator or by hand and never by syncing — summary_source says
-// which, so a generated one can be redone and a hand-written one is never overwritten.
+// The text on the card. BGG supplies it in English: the short description from its JSON API,
+// with short_checked_at so a game BGG has none for is not asked about on every sync, and the
+// long description from the XML API as a fallback. `summary` is the German version — translated
+// (summary_source 'ai', with summary_from holding the English it was translated from, so a
+// changed original is translated again) or written by hand ('manual', never overwritten).
 addColumnIfMissing("games", "description", "TEXT");
+addColumnIfMissing("games", "short_description", "TEXT");
+addColumnIfMissing("games", "short_checked_at", "TEXT");
 addColumnIfMissing("games", "summary", "TEXT");
 addColumnIfMissing("games", "summary_source", "TEXT");
+if (addColumnIfMissing("games", "summary_from", "TEXT")) {
+  // Summaries from before this column were composed from scratch rather than translated from
+  // BGG's text, which is no longer wanted. Hand-written ones stay.
+  const dropped = db
+    .prepare("UPDATE games SET summary = NULL, summary_source = NULL WHERE summary_source = 'ai'")
+    .run().changes;
+  if (dropped > 0) console.log(`[db] migrated: dropped ${dropped} generated summaries, BGG's text replaces them`);
+}
 
 // Soft matches. Added after the rebuild above, which only carries the columns it knows about.
 addColumnIfMissing("matches", "kind", "TEXT NOT NULL DEFAULT 'full'");

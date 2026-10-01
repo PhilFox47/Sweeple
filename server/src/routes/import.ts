@@ -3,7 +3,7 @@ import { authenticate, requireAdmin } from "../auth.js";
 import { collectionUrl, configuredToken, parseCollectionXml, parsePlaysXml, parseThingXml, thingUrl } from "../bgg.js";
 import { applyCollection, applyDetails, applyPlays, gamesMissingDetails } from "../store.js";
 import { db } from "../db.js";
-import { generateMissingSummaries } from "../summaries.js";
+import { translateMissing } from "../translate.js";
 import { broadcast } from "../ws.js";
 
 const DETAIL_CHUNK = 20;
@@ -80,8 +80,8 @@ export default async function importRoutes(app: FastifyInstance) {
         if (details.length === 0) return reply.code(400).send({ error: "In dieser Antwort sind keine Spiele." });
         const result = applyDetails(details);
         broadcast({ type: "library-changed" });
-        // Details are what a summary is written from, so this is when one becomes possible.
-        void generateMissingSummaries();
+        // A description is the fallback blurb for games BGG has no short description for.
+        void translateMissing();
         const expansions = details.filter((d) => d.isExpansion).length;
         return {
           kind,

@@ -431,6 +431,80 @@ export async function fetchGameDetails(
   return results;
 }
 
+/**
+ * BGG's one-line "short description" — the sentence under the title on a game's page. The XML
+ * API does not carry it; the site loads it from BGG's own JSON API, so that is where it comes
+ * from. No token: that API is the website's, not the registered XML one.
+ */
+export const BGG_JSON_ORIGIN = process.env.BGG_JSON_ORIGIN ?? "https://api.geekdo.com";
+
+export function shortDescriptionUrl(bggId: number): string {
+  return `${BGG_JSON_ORIGIN}/api/geekitems?objectid=${bggId}&objecttype=thing`;
+}
+
+/** The short description from a geekitems response, or null when the game has none. */
+export function parseShortDescription(json: string): string | null {
+  let data: any;
+  try {
+    data = JSON.parse(json);
+  } catch {
+    throw new Error("Die Antwort von BGG war kein JSON.");
+  }
+  if (!data?.item) throw new Error("Die Antwort von BGG enthält kein Spiel.");
+  return cleanDescription(data.item.short_description);
+}
+
+/**
+ * One game's short description: a string, null when BGG has none, or undefined when BGG could
+ * not be asked — so the caller can tell "has none" (do not ask again) from "try next time".
+ */
+export async function fetchShortDescription(bggId: number, signal?: AbortSignal): Promise<string | null | undefined> {
+  const url = shortDescriptionUrl(bggId);
+  const headers = { ...BROWSER_HEADERS, Accept: "application/json" };
+  try {
+    let res: Fetched = useBrowser
+      ? await browserFetch(url)
+      : await fetch(url, { headers, signal }).then(async (r) => ({
+          status: r.status,
+          body: await r.text(),
+          header: (n: string) => r.headers.get(n),
+        }));
+    // The same Cloudflare front as the XML API; let the browser try where plain HTTP is refused.
+    if ((res.status === 403 || res.status === 503) && FETCH_MODE === "auto" && !useBrowser) {
+      res = await browserFetch(url);
+    }
+    if (res.status === 404) return null;
+    if (res.status < 200 || res.status >= 300) {
+      logRejection(url, res, res.body);
+      return undefined;
+    }
+    return parseShortDescription(res.body);
+  } catch (err) {
+    if (isCancellation(err) || signal?.aborted) throw new SyncCancelledError();
+    console.warn(`[bgg] short description for ${bggId}: ${err instanceof Error ? err.message : err}`);
+    return undefined;
+  }
+}
+
+/**
+ * Short descriptions for several games, politely spaced: one request per game, which BGG asks
+ * to keep to a minimum, so callers only pass games that have never been checked.
+ */
+export async function fetchShortDescriptions(
+  bggIds: number[],
+  options: BggRequestOptions = {}
+): Promise<Map<number, string | null>> {
+  const found = new Map<number, string | null>();
+  for (let i = 0; i < bggIds.length; i++) {
+    if (options.signal?.aborted) throw new SyncCancelledError();
+    options.onProgress?.(`Lade Kurzbeschreibungen ${i + 1}/${bggIds.length}`);
+    const text = await fetchShortDescription(bggIds[i], options.signal);
+    if (text !== undefined) found.set(bggIds[i], text);
+    if (i + 1 < bggIds.length) await sleep(1000, options.signal);
+  }
+  return found;
+}
+
 export interface PlayStats {
   bggId: number;
   numPlays: number;

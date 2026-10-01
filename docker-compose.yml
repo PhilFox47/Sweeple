@@ -11,7 +11,9 @@ services:
       BGG_COOKIE: ${BGG_COOKIE:-}
       BGG_USER_AGENT: ${BGG_USER_AGENT:-}
       BGG_TOKEN: ${BGG_TOKEN:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      NANOGPT_API_KEY: ${NANOGPT_API_KEY:-}
+      NANOGPT_MODEL: ${NANOGPT_MODEL:-}
+      NANOGPT_BASE_URL: ${NANOGPT_BASE_URL:-https://nano-gpt.com/api/v1}
     volumes:
       - sweeple-data:/data
 

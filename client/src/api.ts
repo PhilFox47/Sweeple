@@ -36,7 +36,7 @@ export interface Game {
   lastPlayedAt: string | null;
   isExpansion: boolean;
   expansionMode: ExpansionMode;
-  /** Two or three German sentences on what to expect, for someone who has never played it. */
+  /** BGG's short description — in German when a translation or hand-written version exists. */
   summary: string | null;
   /** How the player looking at the card has voted on it before. */
   yourVotes: { likes: number; total: number };
@@ -57,16 +57,23 @@ export interface LibraryGame {
   /** Whether the deck currently leaves it out, once the override is applied. */
   hidden: boolean;
   rating: GameRating;
+  /** BGG's English blurb, the original any German version is made from. */
+  english: string | null;
+  /** What the card shows right now, and in which language. */
   summary: string | null;
-  /** "ai" when generated, "manual" when written by hand — a hand-written one is never replaced. */
+  summaryLanguage: "de" | "en" | null;
+  /** "ai" when translated, "manual" when written by hand — a hand-written one is never replaced. */
   summarySource: "ai" | "manual" | null;
 }
 
-export interface SummaryStatus {
+export interface TranslationStatus {
   configured: boolean;
+  missing: ("NANOGPT_API_KEY" | "NANOGPT_MODEL")[];
+  model: string | null;
   running: boolean;
-  missing: number;
-  missingWithDescription: number;
+  withText: number;
+  inGerman: number;
+  withoutText: number;
   done: number;
   lastError: string | null;
 }
@@ -234,8 +241,8 @@ export const api = {
     }),
   removeAvatar: (id: number) => request<{ ok: true }>(`/api/users/${id}/avatar`, { method: "DELETE" }),
 
-  summaryStatus: () => request<SummaryStatus>("/api/summaries"),
-  generateSummaries: () => request<SummaryStatus>("/api/summaries/generate", { method: "POST" }),
+  translationStatus: () => request<TranslationStatus>("/api/summaries"),
+  translateSummaries: () => request<TranslationStatus>("/api/summaries/translate", { method: "POST" }),
   setSummary: (gameId: number, summary: string | null) =>
     request<{ ok: true }>(`/api/games/${gameId}/summary`, { method: "PUT", body: JSON.stringify({ summary }) }),
 

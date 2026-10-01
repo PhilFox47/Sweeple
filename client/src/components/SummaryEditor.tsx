@@ -2,11 +2,11 @@ import { useState } from "react";
 import { api, type LibraryGame } from "../api";
 
 /**
- * The summary for one game, editable. Saving makes it hand-written, which the generator never
- * touches again; clearing it hands the game back to the generator.
+ * The German text for one game, next to BGG's English original. Saving makes it hand-written,
+ * which nothing replaces; clearing goes back to BGG's text or its translation.
  */
-export default function SummaryEditor({ game, onSaved }: { game: LibraryGame; onSaved: (summary: string | null) => void }) {
-  const [text, setText] = useState(game.summary ?? "");
+export default function SummaryEditor({ game, onSaved }: { game: LibraryGame; onSaved: () => void }) {
+  const [text, setText] = useState(game.summaryLanguage === "de" ? (game.summary ?? "") : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,7 +15,7 @@ export default function SummaryEditor({ game, onSaved }: { game: LibraryGame; on
     setError(null);
     try {
       await api.setSummary(game.id, next);
-      onSaved(next?.trim() || null);
+      onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Das konnte nicht gespeichert werden");
     } finally {
@@ -23,31 +23,39 @@ export default function SummaryEditor({ game, onSaved }: { game: LibraryGame; on
     }
   }
 
+  const source =
+    game.summarySource === "manual"
+      ? "Von Hand geschrieben"
+      : game.summaryLanguage === "de"
+        ? "Von Nano-GPT übersetzt"
+        : game.english
+          ? "Noch englisch"
+          : "BGG hat keinen Text für dieses Spiel";
+
   return (
     <div className="summary-editor">
+      {game.english && (
+        <p className="summary-original">
+          <span className="summary-original-label">BGG</span> {game.english}
+        </p>
+      )}
       <textarea
-        rows={4}
+        rows={3}
         maxLength={600}
-        placeholder="Zwei, drei Sätze: was man in dem Spiel macht und wie es sich anfühlt."
+        placeholder="Auf Deutsch, in ein, zwei Sätzen."
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
       <div className="summary-editor-foot">
-        <span className="summary-source">
-          {game.summarySource === "manual"
-            ? "Von Hand geschrieben"
-            : game.summarySource === "ai"
-              ? "Automatisch erzeugt"
-              : "Noch keine Kurzbeschreibung"}
-        </span>
-        {game.summary && (
+        <span className="summary-source">{source}</span>
+        {game.summarySource === "manual" && (
           <button className="btn btn-quiet" disabled={busy} onClick={() => save(null).then(() => setText(""))}>
-            Leeren
+            Zurücksetzen
           </button>
         )}
         <button
           className="btn btn-primary"
-          disabled={busy || !text.trim() || text.trim() === game.summary}
+          disabled={busy || !text.trim() || (game.summaryLanguage === "de" && text.trim() === game.summary)}
           onClick={() => save(text)}
         >
           Speichern
